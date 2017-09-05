@@ -37,20 +37,20 @@ zcat mgp.v5.merged.snps_all.dbSNP142.vcf.gz |python ../make_vcf_for_vcf2diploid.
 zcat mgp.v5.merged.indels.dbSNP142.normed.vcf.gz | python ../make_vcf_for_vcf2diploid.py P.CAST_M.129S1_F1hybrid.indels.forAlleleSeq.vcf 70 25 11
 # here
 wc -l P.CAST_M.129S1_F1hybrid.snps.forAlleleSeq.vcf
-tail -n xxx P.CAST_M.129S1_F1hybrid.snps.forAlleleSeq.vcf >> P.CAST_M.129S1_F1hybrid.indels.forAlleleSeq.vcf
+tail -n 19514450 P.CAST_M.129S1_F1hybrid.snps.forAlleleSeq.vcf >> P.CAST_M.129S1_F1hybrid.indels.forAlleleSeq.vcf
 mv P.CAST_M.129S1_F1hybrid.indels.forAlleleSeq.vcf P.CAST_M.129S1_F1hybrid.indelsNsnps.forAlleleSeq.vcf
 
 # CAST and 129
 # use CAST_EiJ.bam
 make -f makeMousePersonalGenome.mk DATA_DIR=REL-1505-SNPs_Indels \
-VCF_sampleID=P.CAST.EiJ_M.129S1.SvImJ MAT_SAMPLE_NAME=129S1.SvImJ PAT_SAMPLE_NAME=CAST.EiJ\
+VCF_sampleID=P.CAST.EiJ_M.129S1.SvImJ MAT_SAMPLE_NAME=129S1.SvImJ PAT_SAMPLE_NAME=CAST.EiJ \
 OUTPUT_SAMPLE_NAME=P.CAST_M.129S1_indelsNsnps_CAST.bam \
 FILE_NAME_VCF=P.CAST_M.129S1_F1hybrid.indelsNsnps.forAlleleSeq.vcf \
 FILE_NAME_BAM=CAST_EiJ.bam
 
 # use 129S1_SvImJ.bam
 make -f makeMousePersonalGenome.mk DATA_DIR=REL-1505-SNPs_Indels \
-VCF_sampleID=P.CAST.EiJ_M.129S1.SvImJ MAT_SAMPLE_NAME=129S1.SvImJ PAT_SAMPLE_NAME=CAST.EiJ\
+VCF_sampleID=P.CAST.EiJ_M.129S1.SvImJ MAT_SAMPLE_NAME=129S1.SvImJ PAT_SAMPLE_NAME=CAST.EiJ \
 OUTPUT_SAMPLE_NAME=P.CAST_M.129S1_indelsNsnps_129S1.bam \
 FILE_NAME_VCF=P.CAST_M.129S1_F1hybrid.indelsNsnps.forAlleleSeq.vcf \
 FILE_NAME_BAM=129S1_SvImJ.bam
