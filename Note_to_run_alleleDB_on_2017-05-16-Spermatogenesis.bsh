@@ -1,15 +1,59 @@
-# only use LEP_ZYG_ATGCA
+# only use LEP_ZYG_ATGCA in this note
+#######################################################################
+### quality trim raw reads and make XXX_NotMerged.sort.bam using  proseqHT_forShortInsert.bsh
+# run proseqHT_forShortInsert.bsh on fastq.gz files from core facilities
+
+cd /workdir/sc2457/mouse_AlleleSpecific/test_for_proseqHT
+export mouse_genome=/local/storage/data/short_read_index/mm10/bwa.rRNA-0.7.8-r455/mm10.rRNA.fa.gz
+export mouse_chinfo=/local/storage/data/mm10/mm10.chromInfo
+
+mkdir My_proseqHT_forShortInsert_output_dir
+bash proseqHT_forShortInsert.bsh -I \*.fastq.gz -i $mouse_genome -c $mouse_chinfo -T ./My_proseqHT_forShortInsert_output_dir/ -O ./My_proseqHT_forShortInsert_output_dir/
+
+#######################################################################
+### make combined file for alleleDB 
 cd /workdir/sc2457/mouse_AlleleSpecific/test_for_proseqHT/My_proseqHT_forShortInsert_output_dir/FZUjzmNqeSMTpoeQlIX3uQdKPsMXnMD9/sep
 
+## use all SeqPrepMerged reads and R1 reads
 zcat  LEP_ZYG_ATGCA_SeqPrepMerged.fastq.gz LEP_ZYG_ATGCA_R1.fastq.gz | gzip > ../LEP_ZYG_ATGCA_forAlleleDB.fastq.gz
-cd ..
 
+
+## select R2 reads and fastx_reverse_complement
 # only keep R2 at paired end bam file LEP_ZYG_ATGCA_NotMerged.sort.bam
-# only keep R2 that absolute value of (R2 head - R1 head) is larger than 68, then convert to fastq
+# only keep R2 that absolute value of (R2 head - R1 head) is larger than 68, then convert to reverse_complement fastq.gz
+cd ..
 samtools view -f 0x0080 LEP_ZYG_ATGCA_NotMerged.sort.bam |\
 awk 'BEGIN{OFS="\t"} ($4-$8 >= 68) {print "@"$1"\n"$10"\n+\n"$11}; ($8-$4 >= 68) {print "@"$1"\n"$10"\n+\n"$11}' |\
 fastx_reverse_complement -Q33 |gzip >> LEP_ZYG_ATGCA_forAlleleDB.fastq.gz
 
+#######################################################################
+## run AlleleDB
+
 cd /workdir/sc2457/mouse_AlleleSpecific
 ln -s /workdir/sc2457/mouse_AlleleSpecific/test_for_proseqHT/My_proseqHT_forShortInsert_output_dir/FZUjzmNqeSMTpoeQlIX3uQdKPsMXnMD9/LEP_ZYG_ATGCA_forAlleleDB.fastq.gz .
 
+
+bash alleledb_strandSpecific_9_specifyFASTQ_mouse_SingleEndBowtie.sh \
+LEP_ZYG_ATGCA_forAlleleDB \ 
+PersonalGenome_P.CAST_M.B6 \
+/workdir/sc2457/mouse_AlleleSpecific/mouse_genome.sanger.ac.uk/REL-1505-SNPs_Indels/PersonalGenome_P.CAST_M.B6_indelsNsnps_CAST.bam \
+/workdir/sc2457/mouse_AlleleSpecific/mouse_genome.sanger.ac.uk/REL-1505-SNPs_Indels/PersonalGenome_P.CAST_M.B6_indelsNsnps_CAST.bam/P.CAST_M.B6_indelsNsnps_CAST.bam.alleleDBInput.snp.bed \
+/workdir/sc2457/mouse_AlleleSpecific \
+LEP_ZYG_ATGCA_forAlleleDB \
+/workdir/sc2457/alleleDB/alleledb_pipeline_mouse \
+/workdir/sc2457/mouse_AlleleSpecific/PIPELINE_StrandSpecific_P.CAST_M.B6.mk \
+0.1 \
+ase \
+0 > allelicbias-PersonalGenome_P.CAST_M.B6-LEP_ZYG_ATGCA_forAlleleDB.log 2>&1
+
+#NAME          =LEP_ZYG_ATGCA_forAlleleDB
+#PGENOME       =PersonalGenome_P.CAST_M.B6
+#PGENOME_PATH  =/workdir/sc2457/mouse_AlleleSpecific/mouse_genome.sanger.ac.uk/REL-1505-SNPs_Indels/PersonalGenome_P.CAST_M.B6_indelsNsnps_CAST.bam
+#SNPCALLS_PATH =/workdir/sc2457/mouse_AlleleSpecific/mouse_genome.sanger.ac.uk/REL-1505-SNPs_Indels/PersonalGenome_P.CAST_M.B6_indelsNsnps_CAST.bam/P.CAST_M.B6_indelsNsnps_CAST.bam.alleleDBInput.snp.bed
+#FASTQ_PATH    =/workdir/sc2457/mouse_AlleleSpecific
+#BASENAME/FASTQ=LEP_ZYG_ATGCA_forAlleleDB
+#PIPELINE/PL   =/workdir/sc2457/alleleDB/alleledb_pipeline_mouse
+#PIPELINE_FNAME=/workdir/sc2457/mouse_AlleleSpecific/PIPELINE_StrandSpecific_P.CAST_M.B6.mk
+#FDR_THRESHOLD =0.1
+#ASB/ASE       =ase
+#FLAG          =0
