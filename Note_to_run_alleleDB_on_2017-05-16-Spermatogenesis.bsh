@@ -1,0 +1,15 @@
+# only use LEP_ZYG_ATGCA
+cd /workdir/sc2457/mouse_AlleleSpecific/test_for_proseqHT/My_proseqHT_forShortInsert_output_dir/FZUjzmNqeSMTpoeQlIX3uQdKPsMXnMD9/sep
+
+zcat  LEP_ZYG_ATGCA_SeqPrepMerged.fastq.gz LEP_ZYG_ATGCA_R1.fastq.gz | gzip > ../LEP_ZYG_ATGCA_forAlleleDB.fastq.gz
+cd ..
+
+# only keep R2 at paired end bam file LEP_ZYG_ATGCA_NotMerged.sort.bam
+# only keep R2 that absolute value of (R2 head - R1 head) is larger than 68, then convert to fastq
+samtools view -f 0x0080 LEP_ZYG_ATGCA_NotMerged.sort.bam |\
+awk 'BEGIN{OFS="\t"} ($4-$8 >= 68) {print "@"$1"\n"$10"\n+\n"$11}; ($8-$4 >= 68) {print "@"$1"\n"$10"\n+\n"$11}' |\
+fastx_reverse_complement -Q33 |gzip >> LEP_ZYG_ATGCA_forAlleleDB.fastq.gz
+
+cd /workdir/sc2457/mouse_AlleleSpecific
+ln -s /workdir/sc2457/mouse_AlleleSpecific/test_for_proseqHT/My_proseqHT_forShortInsert_output_dir/FZUjzmNqeSMTpoeQlIX3uQdKPsMXnMD9/LEP_ZYG_ATGCA_forAlleleDB.fastq.gz .
+
