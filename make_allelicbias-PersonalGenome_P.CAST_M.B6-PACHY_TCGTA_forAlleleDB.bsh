@@ -20,10 +20,10 @@ zcat  PACHY_TCGTA_SeqPrepMerged.fastq.gz PACHY_TCGTA_R1.fastq.gz | gzip > ../PAC
 
 ## select R2 reads and fastx_reverse_complement
 # only keep R2 at paired end bam file PACHY_TCGTA_NotMerged.sort.bam
-# only keep R2 that absolute value of (R2 head - R1 head) is larger than 68, then convert to reverse_complement fastq.gz
+# only keep R2 that is NOT overlapped with R1 at all, then convert to reverse_complement fastq.gz
 cd ..
-samtools view -f 0x0080 PACHY_TCGTA_NotMerged.sort.bam |\
-awk 'BEGIN{OFS="\t"} ($4-$8 >= 68) {print "@"$1"\n"$10"\n+\n"$11}; ($8-$4 >= 68) {print "@"$1"\n"$10"\n+\n"$11}' |\
+samtools view -f 0x2 PACHY_TCGTA_NotMerged.sort.bam | awk 'BEGIN{OFS="\t"} {print $1,$10,$11,$4,$3,$6,$7,$8,$9,length($10)}' |paste - - | \
+awk 'BEGIN{OFS="\t"} ($14-$18 >= $10) {print "@"$11"_2\n"$12"\n+"$11"_2\n"$13}; ($18-$14 >= $20) {print "@"$11"_2\n"$12"\n+"$11"_2\n"$13}' | \
 fastx_reverse_complement -Q33 |gzip >> PACHY_TCGTA_forAlleleDB.fastq.gz
 
 #######################################################################
@@ -34,7 +34,7 @@ ln -s /workdir/sc2457/mouse_AlleleSpecific/test_for_proseqHT/My_proseqHT_forShor
 
 
 bash alleledb_strandSpecific_9_specifyFASTQ_mouse_SingleEndBowtie.sh \
-PACHY_TCGTA_forAlleleDB \ 
+PACHY_TCGTA_forAlleleDB \
 PersonalGenome_P.CAST_M.B6 \
 /workdir/sc2457/mouse_AlleleSpecific/mouse_genome.sanger.ac.uk/REL-1505-SNPs_Indels/PersonalGenome_P.CAST_M.B6_indelsNsnps_CAST.bam \
 /workdir/sc2457/mouse_AlleleSpecific/mouse_genome.sanger.ac.uk/REL-1505-SNPs_Indels/PersonalGenome_P.CAST_M.B6_indelsNsnps_CAST.bam/P.CAST_M.B6_indelsNsnps_CAST.bam.alleleDBInput.snp.bed \
@@ -46,3 +46,14 @@ PACHY_TCGTA_forAlleleDB \
 ase \
 0 > allelicbias-PersonalGenome_P.CAST_M.B6-PACHY_TCGTA_forAlleleDB.log 2>&1
 
+#NAME          =PACHY_TCGTA_forAlleleDB
+#PGENOME       =PersonalGenome_P.CAST_M.B6
+#PGENOME_PATH  =/workdir/sc2457/mouse_AlleleSpecific/mouse_genome.sanger.ac.uk/REL-1505-SNPs_Indels/PersonalGenome_P.CAST_M.B6_indelsNsnps_CAST.bam
+#SNPCALLS_PATH =/workdir/sc2457/mouse_AlleleSpecific/mouse_genome.sanger.ac.uk/REL-1505-SNPs_Indels/PersonalGenome_P.CAST_M.B6_indelsNsnps_CAST.bam/P.CAST_M.B6_indelsNsnps_CAST.bam.alleleDBInput.snp.bed
+#FASTQ_PATH    =/workdir/sc2457/mouse_AlleleSpecific
+#BASENAME/FASTQ=PACHY_TCGTA_forAlleleDB
+#PIPELINE/PL   =/workdir/sc2457/alleleDB/alleledb_pipeline_mouse
+#PIPELINE_FNAME=/workdir/sc2457/mouse_AlleleSpecific/PIPELINE_StrandSpecific_P.CAST_M.B6.mk
+#FDR_THRESHOLD =0.1
+#ASB/ASE       =ase
+#FLAG          =0
