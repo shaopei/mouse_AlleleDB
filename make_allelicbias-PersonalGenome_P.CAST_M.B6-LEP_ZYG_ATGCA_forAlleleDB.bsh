@@ -3,12 +3,12 @@
 ### quality trim raw reads and make XXX_NotMerged.sort.bam using  proseqHT_forShortInsert.bsh
 # run proseqHT_forShortInsert.bsh on fastq.gz files from core facilities
 
-cd /workdir/sc2457/mouse_AlleleSpecific/test_for_proseqHT
-export mouse_genome=/local/storage/data/short_read_index/mm10/bwa.rRNA-0.7.8-r455/mm10.rRNA.fa.gz
-export mouse_chinfo=/local/storage/data/mm10/mm10.chromInfo
+#cd /workdir/sc2457/mouse_AlleleSpecific/test_for_proseqHT
+#export mouse_genome=/local/storage/data/short_read_index/mm10/bwa.rRNA-0.7.8-r455/mm10.rRNA.fa.gz
+#export mouse_chinfo=/local/storage/data/mm10/mm10.chromInfo
 
-mkdir My_proseqHT_forShortInsert_output_dir
-bash proseqHT_forShortInsert.bsh -I \*.fastq.gz -i $mouse_genome -c $mouse_chinfo -T ./My_proseqHT_forShortInsert_output_dir/ -O ./My_proseqHT_forShortInsert_output_dir/
+#mkdir My_proseqHT_forShortInsert_output_dir
+#bash proseqHT_forShortInsert.bsh -I \*.fastq.gz -i $mouse_genome -c $mouse_chinfo -T ./My_proseqHT_forShortInsert_output_dir/ -O ./My_proseqHT_forShortInsert_output_dir/
 
 #######################################################################
 ### make combined file for alleleDB 
@@ -20,10 +20,17 @@ zcat  LEP_ZYG_ATGCA_SeqPrepMerged.fastq.gz LEP_ZYG_ATGCA_R1.fastq.gz | gzip > ..
 
 ## select R2 reads and fastx_reverse_complement
 # only keep R2 at paired end bam file LEP_ZYG_ATGCA_NotMerged.sort.bam
-# only keep R2 that absolute value of (R2 head - R1 head) is larger than 68, then convert to reverse_complement fastq.gz
+# only keep R2 that is NOT overlapped with R1 at all, then convert to reverse_complement fastq.gz
 cd ..
+samtools view -f 0x2 LEP_ZYG_ATGCA_NotMerged.sort.bam | awk 'BEGIN{OFS="\t"} {print $1,$10,$11,$4,$3,$6,$7,$8,$9,length($10)}' |paste - - | \
+awk 'BEGIN{OFS="\t"} ($14-$18 >= $10) {print "@"$11"\n"$12"\n+"$11"\n"$13}; ($18-$14 >= $20) {print "@"$11"\n"$12"\n+"$11"\n"$13}' | \
+fastx_reverse_complement -Q33 |gzip >> LEP_ZYG_ATGCA_forAlleleDB.fastq.gz
+
+
+
+
 samtools view -f 0x0080 LEP_ZYG_ATGCA_NotMerged.sort.bam |\
-awk 'BEGIN{OFS="\t"} ($4-$8 >= 68) {print "@"$1"\n"$10"\n+\n"$11}; ($8-$4 >= 68) {print "@"$1"\n"$10"\n+\n"$11}' |\
+awk 'BEGIN{OFS="\t"} ($4-$8 >= 68) {print "@"$1"\n"$10"\n+\n"$11}; ($8-$4 >= 68) {print "@"$1"\n"$10"\n+\n"$11}'  |\
 fastx_reverse_complement -Q33 |gzip >> LEP_ZYG_ATGCA_forAlleleDB.fastq.gz
 
 #######################################################################
