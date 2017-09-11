@@ -23,14 +23,7 @@ zcat  LEP_ZYG_ATGCA_SeqPrepMerged.fastq.gz LEP_ZYG_ATGCA_R1.fastq.gz | gzip > ..
 # only keep R2 that is NOT overlapped with R1 at all, then convert to reverse_complement fastq.gz
 cd ..
 samtools view -f 0x2 LEP_ZYG_ATGCA_NotMerged.sort.bam | awk 'BEGIN{OFS="\t"} {print $1,$10,$11,$4,$3,$6,$7,$8,$9,length($10)}' |paste - - | \
-awk 'BEGIN{OFS="\t"} ($14-$18 >= $10) {print "@"$11"\n"$12"\n+"$11"\n"$13}; ($18-$14 >= $20) {print "@"$11"\n"$12"\n+"$11"\n"$13}' | \
-fastx_reverse_complement -Q33 |gzip >> LEP_ZYG_ATGCA_forAlleleDB.fastq.gz
-
-
-
-
-samtools view -f 0x0080 LEP_ZYG_ATGCA_NotMerged.sort.bam |\
-awk 'BEGIN{OFS="\t"} ($4-$8 >= 68) {print "@"$1"\n"$10"\n+\n"$11}; ($8-$4 >= 68) {print "@"$1"\n"$10"\n+\n"$11}'  |\
+awk 'BEGIN{OFS="\t"} ($14-$18 >= $10) {print "@"$11"_2\n"$12"\n+"$11"_2\n"$13}; ($18-$14 >= $20) {print "@"$11"_2\n"$12"\n+"$11"_2\n"$13}' | \
 fastx_reverse_complement -Q33 |gzip >> LEP_ZYG_ATGCA_forAlleleDB.fastq.gz
 
 #######################################################################
@@ -41,7 +34,7 @@ ln -s /workdir/sc2457/mouse_AlleleSpecific/test_for_proseqHT/My_proseqHT_forShor
 
 
 bash alleledb_strandSpecific_9_specifyFASTQ_mouse_SingleEndBowtie.sh \
-LEP_ZYG_ATGCA_forAlleleDB \ 
+LEP_ZYG_ATGCA_forAlleleDB \
 PersonalGenome_P.CAST_M.B6 \
 /workdir/sc2457/mouse_AlleleSpecific/mouse_genome.sanger.ac.uk/REL-1505-SNPs_Indels/PersonalGenome_P.CAST_M.B6_indelsNsnps_CAST.bam \
 /workdir/sc2457/mouse_AlleleSpecific/mouse_genome.sanger.ac.uk/REL-1505-SNPs_Indels/PersonalGenome_P.CAST_M.B6_indelsNsnps_CAST.bam/P.CAST_M.B6_indelsNsnps_CAST.bam.alleleDBInput.snp.bed \
