@@ -202,55 +202,55 @@ for name in `ls $FQ_INPUT | awk -F"/" '{print $NF}' | rev | cut -d \. -f 3-| cut
   done
 
 wait
-gzip -d ${TMPDIR}/noadapt/#*.fastq.gz
+gzip -d ${TMPDIR}/noadapt/*.fastq.gz
 
 for name in `ls $FQ_INPUT | awk -F"/" '{print $NF}' | rev | cut -d \. -f 3-| cut -d _ -f 2- |rev | sort | uniq`
  do
 
   ### for the reads that are not merged
   ## Remove adapter
-  cutadapt -a AGATCGGAAGAGCACACGTCTGAACTC -e 0.10 --overlap 2 --minimum-length=10 --output=${TMPDIR}/noadapt/${name}_noadapt_R1.fastq ${TMPDIR}/${name}_SeqPrep_R1.fastq.gz
-  cutadapt -a GATCGTCGGACTGTAGAACTCTGAACG -e 0.10 --overlap 2 --minimum-length=10 --output=${TMPDIR}/noadapt/${name}_noadapt_R2.fastq ${TMPDIR}/${name}_SeqPrep_R2.fastq.gz
- 
+  cutadapt -a AGATCGGAAGAGCACACGTCTGAACTC -e 0.10 --overlap 2 --minimum-length=10 --output=${TMPDIR}/noadapt/${name}_noadapt_R1.fastq ${TMPDIR}/${name}_SeqPrep_R1.fastq.gz &
+  cutadapt -a GATCGTCGGACTGTAGAACTCTGAACG -e 0.10 --overlap 2 --minimum-length=10 --output=${TMPDIR}/noadapt/${name}_noadapt_R2.fastq ${TMPDIR}/${name}_SeqPrep_R2.fastq.gz &
+  wait
+
+
   ## Collapse reads using prinseq-lite.pl.
   ## Remove PCR duplciates.  Keep read length >=15
-  prinseq-lite.pl -fastq ${TMPDIR}/noadapt/${name}_noadapt_R1.fastq -fastq2 ${TMPDIR}/noadapt/${name}_noadapt_R2.fastq -derep 1 -out_format 3 -out_bad null -out_good ${TMPDIR}/nodups/${name}_dedup -min_len 15 2> ${OUTPUT}/${name}.prinseq-pcrDups.gd
+  prinseq-lite.pl -fastq ${TMPDIR}/noadapt/${name}_noadapt_R1.fastq -fastq2 ${TMPDIR}/noadapt/${name}_noadapt_R2.fastq -derep 1 -out_format 3 -out_bad null -out_good ${TMPDIR}/nodups/${name}_dedup -min_len 15 2> ${OUTPUT}/${name}.prinseq-pcrDups.gd &
 
   done
+
 
 for name in `ls $FQ_INPUT | awk -F"/" '{print $NF}' | rev | cut -d \. -f 3-| cut -d _ -f 2- |rev | sort | uniq`
  do
   ### for the reads that are Merged 
   # Remove PCR duplciates. Keep read length >=20
-  prinseq-lite.pl -fastq ${TMPDIR}/noadapt/${name}_SeqPrepMerged.fastq -derep 1 -out_format 3 -out_bad null -out_good ${TMPDIR}/nodups/${name}_SeqPrepMerged_dedup -min_len 20 2> ${OUTPUT}/${name}_SeqPrepMerged.prinseq-pcrDups.gd
-  # use the sepIndex_MergedReads.py to Trims 5-prime UMI and J-barcode AND 3-prime UMI 
-  python sepIndex_MergedReads.py ${TMPDIR}/nodups/${name}_SeqPrepMerged_dedup.fastq ${TMPDIR}/sep/${name} &
-
+  prinseq-lite.pl -fastq ${TMPDIR}/noadapt/${name}_SeqPrepMerged.fastq -derep 1 -out_format 3 -out_bad null -out_good ${TMPDIR}/nodups/${name}_SeqPrepMerged_dedup -min_len 20 2> ${OUTPUT}/${name}_SeqPrepMerged.prinseq-pcrDups.gd &
  done
 
 wait
 
 ## Cleanup.
 #rm ${TMPDIR}/noadapt/*.fastq
-#rm ${TMPDIR}/nodups/*.fastq
+gzip ${TMPDIR}/nodups/*.fastq
 
 
 #############################################
 ## Align reads.
 echo " "
 echo "Mapping reads:"
-for name in `ls ${TMPDIR}/nodups/*.fastq.gz | awk -F"/" '{print $NF}' | rev | cut -d \. -f 2- | cut -d _ -f2- | rev| sort | uniq`
+for name in `ls ${TMPDIR}/nodups/*.fastq.gz  | awk -F"/" '{print $NF}' |grep -v singletons| rev | cut -d \. -f 2- | cut -d _ -f3- | rev| sort | uniq`
  do
   ## Align using BWA.
   # aligh pair end reads using bwa mem
-  bwa mem -k 19 -t 32 ${BWAIDX} ${TMPDIR}/sep/${name}_R1.fastq.gz ${TMPDIR}/sep/${name}_R2.fastq.gz | \
+  bwa mem -k 19 -t 32 ${BWAIDX} ${TMPDIR}/nodups/${name}_dedup_1.fastq.gz ${TMPDIR}/nodups/${name}_dedup_2.fastq.gz | \
   samtools view -bf 0x2 -q 10 - | samtools sort -n -@ 32 - > ${TMPDIR}/${name}_NotMerged.sort.bam &
 
   # aligh merged end reads using bwa aln
   #bwa aln ref.fa short_read.fq > aln_sa.sai
-  bwa aln -t 32 ${BWAIDX} ${TMPDIR}/sep/${name}_SeqPrepMerged.fastq.gz > ${TMPDIR}/${name}_SeqPrepMerged.bwa_aln.sai
+  bwa aln -t 32 ${BWAIDX} ${TMPDIR}/nodups/${name}_SeqPrepMerged_dedup.fastq.gz > ${TMPDIR}/${name}_SeqPrepMerged.bwa_aln.sai
   #bwa samse ref.fa aln_sa.sai short_read.fq > aln-se.sam
-  bwa samse ${BWAIDX} ${TMPDIR}/${name}_SeqPrepMerged.bwa_aln.sai ${TMPDIR}/sep/${name}_SeqPrepMerged.fastq.gz | \
+  bwa samse ${BWAIDX} ${TMPDIR}/${name}_SeqPrepMerged.bwa_aln.sai ${TMPDIR}/nodups/${name}_SeqPrepMerged_dedup.fastq.gz | \
   samtools view -b -q 10 - | samtools sort -n -@ 32 - > ${TMPDIR}/${name}_SeqPrepMerged.sort.bam &
   
  done
