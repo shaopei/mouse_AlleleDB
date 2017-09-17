@@ -1,9 +1,9 @@
 BASE=/workdir/sc2457/
 PL:= $(BASE)/alleleDB/alleledb_pipeline_mouse
-SNPS:=$(BASE)/mouse_AlleleSpecific/mouse_genome.sanger.ac.uk/REL-1505-SNPs_Indels/PersonalGenome_P.CAST_M.129S1_indelsNsnps_CAST.bam/P.CAST_M.129S1_indelsNsnps_CAST.bam.alleleSeqInput.snp
-CNVS:=$(BASE)/mouse_AlleleSpecific/mouse_genome.sanger.ac.uk/REL-1505-SNPs_Indels/PersonalGenome_P.CAST_M.129S1_indelsNsnps_CAST.bam/P.CAST_M.129S1_indelsNsnps_CAST.bam.alleleSeqInput.cnv
+SNPS:=$(BASE)/mouse_AlleleSpecific/mouse_genome.sanger.ac.uk/REL-1505-SNPs_Indels/PersonalGenome_P.CAST_M.129S1_indelsNsnps_CAST.subsample.bam/P.CAST_M.129S1_indelsNsnps_CAST.subsample.bam.alleleSeqInput.snp
+CNVS:=$(BASE)/mouse_AlleleSpecific/mouse_genome.sanger.ac.uk/REL-1505-SNPs_Indels/PersonalGenome_P.CAST_M.129S1_indelsNsnps_CAST.bam/P.CAST_M.129S1_indelsNsnps_CAST.subsample.bam.alleleSeqInput.cnv
 BNDS:=hits.bed
-MAPS:=$(BASE)/mouse_AlleleSpecific/mouse_genome.sanger.ac.uk/REL-1505-SNPs_Indels/PersonalGenome_P.CAST_M.129S1_indelsNsnps_CAST.bam/%s_P.CAST.EiJ_M.129S1.SvImJ.map
+MAPS:=$(BASE)/mouse_AlleleSpecific/mouse_genome.sanger.ac.uk/REL-1505-SNPs_Indels/PersonalGenome_P.CAST_M.129S1_indelsNsnps_CAST.subsample.bam/%s_P.CAST.EiJ_M.129S1.SvImJ.map
 FDR_SIMS:=5
 FDR_CUTOFF:=0.1
 
