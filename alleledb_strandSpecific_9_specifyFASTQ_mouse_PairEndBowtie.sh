@@ -119,8 +119,8 @@ if [[ ${FLAG} -eq 1 || ${FLAG} -eq 0 ]] ; then
 	cat tmp_paired_R1.fasta |python ${PL}/alleledb_ConvertTags.py > ${FASTQ}_paired_R1.fasta
 	cat tmp_paired_R2.fasta |python ${PL}/alleledb_ConvertTags.py > ${FASTQ}_paired_R2.fasta
 	# use paired R1 and R2 do bowtie PE
-	bowtie --best --strata -p 20 -v 2 -m 1 -f ${PGENOME_PATH}/AltRefMother/AltRefMother -1 ${FASTQ}_paired_R1.fasta -2 ${FASTQ}_paired_R2.fasta > ${FASTQ}.mat.bowtie 2> ${FASTQ}.mat.log &
-	bowtie --best --strata -p 20 -v 2 -m 1 -f ${PGENOME_PATH}/AltRefFather/AltRefFather -1 ${FASTQ}_paired_R1.fasta -2 ${FASTQ}_paired_R2.fasta > ${FASTQ}.pat.bowtie 2> ${FASTQ}.pat.log &
+	bowtie --best --strata -p 20 -v 2 -m 1 -X 600 -f ${PGENOME_PATH}/AltRefMother/AltRefMother -1 ${FASTQ}_paired_R1.fasta -2 ${FASTQ}_paired_R2.fasta > ${FASTQ}.mat.bowtie 2> ${FASTQ}.mat.log &
+	bowtie --best --strata -p 20 -v 2 -m 1 -X 600 -f ${PGENOME_PATH}/AltRefFather/AltRefFather -1 ${FASTQ}_paired_R1.fasta -2 ${FASTQ}_paired_R2.fasta > ${FASTQ}.pat.bowtie 2> ${FASTQ}.pat.log &
 
 	#zcat ${FASTQ_PATH}/${FASTQ}.fastq.gz | gzip -c | ${PL}/alleledb_filter_input.sh ${PL} - | bowtie --best --strata -p 20 -v 2 -m 1 -f ${PGENOME_PATH}/AltRefMother/AltRefMother - > ${FASTQ}.mat.bowtie 2> ${FASTQ}.mat.log & 
 	#zcat ${FASTQ_PATH}/${FASTQ}.fastq.gz | gzip -c | ${PL}/alleledb_filter_input.sh ${PL} - | bowtie --best --strata -p 20 -v 2 -m 1 -f ${PGENOME_PATH}/AltRefFather/AltRefFather - > ${FASTQ}.pat.bowtie 2> ${FASTQ}.pat.log &
