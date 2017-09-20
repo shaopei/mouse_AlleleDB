@@ -237,9 +237,9 @@ for f in ${TMPDIR}/*.sort.bam
 
    ## Report the 5' end of the RNA is on the 5' end of R2 read, but opposite strand
    if [ "${MAP5}" == "TRUE" ] ; then 
-      bedtools bamtobed -bedpe -mate1 -i $f 2> ${TMPDIR}/${j}_NotMerged.kill.warnings | awk 'BEGIN{OFS="\t"} ($9 == "+") {print $1,$5-1,$5,$7,$8,$10} ; ($9 == "-"){print $1,$6,$6+1,$7,$8,$10} ' |gzip > ${TMPDIR}/${j}.bed.gz      
+      bedtools bamtobed -bedpe -mate1 -i $f 2> ${TMPDIR}/${j}_NotMerged.kill.warnings | awk 'BEGIN{OFS="\t"} ($9 == "+") {print $1,$6,$6+1,$7,$8,$10} ; ($9 == "-") {print $1,$5-1,$5,$7,$8,$10}' |gzip > ${TMPDIR}/${j}.bed.gz      
    else  ## report the 3-prime end of the RNA, is the 5' end of R1 read, but opposite strand
-      bedtools bamtobed -bedpe -mate1 -i $f 2> ${TMPDIR}/${j}_NotMerged.kill.warnings | awk 'BEGIN{OFS="\t"} ($9 == "+") {print $1,$3-1,$3,$7,$8,$10}; ($9 == "-") {print $1,$2,$2+1,$7,$8,$10}' |gzip  > ${TMPDIR}/${j}.bed.gz
+      bedtools bamtobed -bedpe -mate1 -i $f 2> ${TMPDIR}/${j}_NotMerged.kill.warnings | awk 'BEGIN{OFS="\t"} ($9 == "+") {print $1,$2,$2+1,$7,$8,$10}; ($9 == "-") {print $1,$3-1,$3,$7,$8,$10}' |gzip  > ${TMPDIR}/${j}.bed.gz
    fi
 
    echo 'Number of mappable reads:' >> ${OUTPUT}/${j}.align.log
