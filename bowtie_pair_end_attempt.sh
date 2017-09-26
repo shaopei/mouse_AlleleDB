@@ -4,11 +4,18 @@
 	zcat ${FASTQ_PATH}/${FASTQ}.fastq.gz | gzip -c | ${PL}/alleledb_filter_input.sh ${PL} - | bowtie --best --strata -p 20 -v 2 -m 1 -f ${PGENOME_PATH}/AltRefFather/AltRefFather - > ${FASTQ}.pat.bowtie 2> ${FASTQ}.pat.log &
 	
 
-	/workdir/sc2457/alleleDB/alleledb_pipeline/alleledb_filter_input.sh /workdir/sc2457/alleleDB/alleledb_pipeline/ DIPLO_CGATA_R1.fastq.gz > DIPLO_CGATA_R1_filtered.fasta
+zcat DIPLO_CGATA_R1.fastq.gz | python /workdir/sc2457/alleleDB/alleledb_pipeline/fastq2result.py - - |  python /workdir/sc2457/alleleDB/alleledb_pipeline/filter_query.py - - | python ${PL}/alleledb_ConvertTags.py
+
+
+	/workdir/sc2457/alleleDB/alleledb_pipeline/alleledb_filter_input.sh /workdir/sc2457/alleleDB/alleledb_pipeline/ LEP_ZYG_ATGCA_R1.fastq.gz > LEP_ZYG_ATGCA_R1_filtered.fasta
+	/workdir/sc2457/alleleDB/alleledb_pipeline/alleledb_filter_input.sh /workdir/sc2457/alleleDB/alleledb_pipeline/ LEP_ZYG_ATGCA_R2.fastq.gz > LEP_ZYG_ATGCA_R2_filtered.fasta
+	
 	/workdir/sc2457/alleleDB/alleledb_pipeline/alleledb_filter_input.sh /workdir/sc2457/alleleDB/alleledb_pipeline/ DIPLO_CGATA_R2.fastq.gz > DIPLO_CGATA_R2_filtered.fasta
 
-	bowtie --best --strata -p 20 -v 2 -m 1 -f /workdir/sc2457/mouse_AlleleSpecific/mouse_genome.sanger.ac.uk/working/PersonalGenome_P.CAST_M.B6_indelsNsnps_CAST.bam/AltRefMother/AltRefMother -1 DIPLO_CGATA_R1_filtered.fasta -2 DIPLO_CGATA_R2_filtered.fasta > DIPLO_CGATA_PE.mat.bowtie
+bowtie --best --strata -p 20 -v 2 -m 1 -f /workdir/sc2457/mouse_AlleleSpecific/mouse_genome.sanger.ac.uk/working/PersonalGenome_P.CAST_M.B6_indelsNsnps_CAST.bam/AltRefMother/AltRefMother DIPLO_CGATA_R2_filtered.fasta > DIPLO_CGATA_R2.mat.bowtie
 
+
+	bowtie --best --strata -p 20 -v 2 -m 1 -f /workdir/sc2457/mouse_AlleleSpecific/mouse_genome.sanger.ac.uk/working/PersonalGenome_P.CAST_M.B6_indelsNsnps_CAST.bam/AltRefMother/AltRefMother -1 DIPLO_CGATA_R1_filtered.fasta -2 DIPLO_CGATA_R2_filtered.fasta > DIPLO_CGATA_PE.mat.bowtie
 	[sc2457@cbsudanko mouse_AlleleSpecific]$ bowtie --best --strata -p 20 -v 2 -m 1 -f /workdir/sc2457/mouse_AlleleSpecific/mouse_genome.sanger.ac.uk/working/PersonalGenome_P.CAST_M.B6_indelsNsnps_CAST.bam/AltRefMother/AltRefMother -1 DIPLO_CGATA_R1_filtered.fasta -2 DIPLO_CGATA_R2_filtered.fasta > DIPLO_CGATA_PE.mat.bowtie
 # reads processed: 3506970
 # reads with at least one reported alignment: 3779 (0.11%)
