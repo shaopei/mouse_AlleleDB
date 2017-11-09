@@ -79,17 +79,18 @@ def viterbi (p, T, x=mat, n=total):
     i = len(x) - 1
     f = np.argmax(v[:,i])
     viterbi_path_backward.append(f)
-    i = i-1
-    while (i>= 0):
+    #i = i-1
+    while (i > 0):
         f = b[f,i]
         viterbi_path_backward.append(f)
-        i -= 1
+        i -= 1 #<- you might be the problem
+    
     viterbi_path_forward = np.array(viterbi_path_backward[::-1])
     plt.plot(np.arange(0,500), n_state[0:500], color='b')
     plt.plot(np.arange(0,500), viterbi_path_forward[0:500], color='red')
     plt.savefig('viterbi_path_forward.pdf')
     plt.close()
-    #plt.show()
+    plt.show()
     return viterbi_path_forward
 
 
@@ -175,6 +176,49 @@ def em_interate(T, p, x=mat, n=total):
     return np.log(new_T), new_P, p_Y_f
 
 
+def em_interate_multiple_input(T, p, x_list, n=_list):
+    t = time.time()
+    for x in x_list:
+        f_p_m, p_Y_f = forward_probability_calculation(x, n, p, T)
+        print "forward: ", t- time.time()
+        b_p_m, p_Y_b = backward_probability_calculation(x, n, p, T)
+        print "backward: ", t- time.time()
+        
+        #local P(Y)
+        p_Y_l = np.full((1, len(x)), float('-inf'))
+        for i in xrange(len(x)):
+            p_Y_l[0,i] = sumLogProb(sumLogProb(b_p_m[0,i]+f_p_m[0,i], b_p_m[1,i]+f_p_m[1, i]),b_p_m[2, i]+f_p_m[2, i])
+        print "p_Y_l ", t- time.time()
+    #A = [[None, None, None], [None, None, None], [None, None, None]]
+    A = np.zeros((3,3))
+    new_P = [None, None, None] #P_m, P_s, P_p 
+    
+    # can add multiple sequence
+    for i in xrange(len(x)-1):
+        for k in range(3):
+            for l in range(3):
+                A[k,l] = A[k,l] + exp(f_p_m[k, i] + T[k,l] + get_emission_log_prob(x[i+1],n[i+1],p[l]) + b_p_m[l, i+1] - p_Y_l[0,i])
+    #A = np.array(A)
+    print "A : ", t- time.time()
+    new_T = np.zeros((3,3))
+    for k in range(3):
+        new_P[k] = np.sum(np.exp(f_p_m[k,] + b_p_m[k,]-p_Y_l) * x ) / np.sum(np.exp(f_p_m[k,] + b_p_m[k,]-p_Y_l) * n ) 
+        new_T[k] = A[k]/A[k].sum()
+    #new_p_Y_f = forward_probability_calculation(p= new_P, T=np.log(new_T))[1]
+    print "secs: ", t- time.time()
+    print new_T, new_P, p_Y_f
+    return np.log(new_T), new_P, p_Y_f
+
+
+def make_em_plot(em_p_Y_f_list, t, file_name='em_p_Y_f_list_plot.pdf', i=0):
+    plt.plot(xrange(i, len(em_p_Y_f_list)),em_p_Y_f_list[i:])
+    plt.xlabel('# of iteration')
+    plt.ylabel('log likelihood')
+    plt.title(t)
+    plt.savefig(file_name)
+    plt.close()
+
+
 #def em(T ,p , threshold = 0.01, max_iter=10):
 new_T, new_P, p_Y_f = em_interate(T, p, x=mat, n=total)
 p_Y_f_list = [p_Y_f]
@@ -188,17 +232,15 @@ for i in xrange(max_iter):
 #print 'Start u = %.2f, theta_h = %.2f, theta_l = %.2f , the final u = %f, theta_h = %f, and theta_l = %f' %(u, theta_h, theta_l, new_u, new_theta_h, new_theta_l)
 #return new_T, new_P, p_Y_f_list
 
-def make_em_plot(em_p_Y_f_list, i, t):
-    plt.plot(xrange(len(em_p_Y_f_list)),em_p_Y_f_list)
-    plt.xlabel('# of iteration')
-    plt.ylabel('log likelihood')
-    plt.title(t)
-    plt.savefig('pset3_sc2457_q3b_'+str(i)+'_plot.pdf')
-    plt.close()
+make_em_plot(p_Y_f_list,"count_min=3", 'em_p_Y_f_list_plot_count_min=3.pdf')
+make_em_plot(p_Y_f_list[5:],"count_min=3",'em_p_Y_f_list_plot_count_min=3_20.pdf' ,20)
+
+
 
 
 
 f_int = "counts_plus_hmm.txt"
+#f_int = "counts_plus_noX.txt"
 data = np.loadtxt(f_int, dtype=str ,delimiter='\t', usecols=range(0,6), skiprows=1)
 chrom = np.loadtxt(f_int, dtype=int ,delimiter='\t', usecols=[0], skiprows=1)
 snppos= np.loadtxt(f_int, dtype=int ,delimiter='\t', usecols=[1], skiprows=1)
@@ -215,7 +257,10 @@ v_path=[]
 for i in xrange(1,20):
     t_c = total[chrom == i]
     x_c = mat[chrom == i]
-    snp_c = snppos[chrom == i]
+    #snp_c = snppos[chrom == i]
+    v_path += (list(viterbi (x=x_c, n=t_c, p=new_P, T=new_T)))
+
+    
 
 snppos_dic={}
 for i in xrange(1,20):
@@ -229,13 +274,25 @@ for i in xrange(1,20):
         else:
             temp.append(snp_c[l])
 
+length_list=[]
+for i in xrange(1,20):
+    for s in snppos_dic[i]:
+        length_list.append(len(s))
+
+
+def hist(x, b=50, output_name = 'hist.pdf'):
+    hist, bins = np.histogram(x, bins=b)
+    width = 0.7 * (bins[1] - bins[0])
+    center = (bins[:-1] + bins[1:]) / 2
+    plt.bar(center, hist, align='center', width=width)
+    plt.savefig(output_name)
+    plt.close()
 
             
         
         
         
-    v_path += (list(viterbi (x=x, n=n, p=new_P, T=new_T)))
-
+    
 state_map = {0:'M', 1:'S', 2:'P'}
 with open(f_int[0:-4]+'_out.txt', 'w') as out:
     out.write("\t".join(['chrm','snppos','mat_allele_count','pat_allele_count','total_reads_count','state', 'hmm_state', 'hmm_post_m', 'hmm_post_s','hmm_post_p']))
