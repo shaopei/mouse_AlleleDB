@@ -79,11 +79,10 @@ def viterbi (p, T, x=mat, n=total):
     i = len(x) - 1
     f = np.argmax(v[:,i])
     viterbi_path_backward.append(f)
-    #i = i-1
     while (i > 0):
         f = b[f,i]
         viterbi_path_backward.append(f)
-        i -= 1 #<- you might be the problem
+        i -= 1
     
     viterbi_path_forward = np.array(viterbi_path_backward[::-1])
     plt.plot(np.arange(0,500), n_state[0:500], color='b')
