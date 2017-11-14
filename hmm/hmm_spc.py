@@ -7,39 +7,6 @@ mpl.use('Agg')
 import matplotlib.pyplot as plt
 import time
 
-#f_int = "counts_plus_hmm.txt"
-#f_int = "counts_minus_hmm.txt"
-f_int = "counts_hmm.txt"
-#data
-mat  = np.loadtxt(f_int, dtype=int ,delimiter='\t', usecols=[2], skiprows=1)
-total = np.loadtxt(f_int, dtype=int ,delimiter='\t', usecols=[4], skiprows=1)
-state = np.loadtxt(f_int, dtype=str ,delimiter='\t', usecols=[5], skiprows=1)
-n_state = np.full(len(state), int(3), dtype=int)
-n_state[state=="M"] = 0
-n_state[state=="S"] = 1
-n_state[state=="P"] = 2
-
-#structure of hmm
-#transition
-# 0,1,2 = M, S, P
-t_mm, t_ms, t_mp = 0.8, 0.1, 0.1
-t_sm, t_ss, t_sp = 0.1, 0.8, 0.1
-t_pm, t_ps, t_pp = 0.1, 0.1, 0.8
-#t_mm, t_ms, t_mp = 0.45, 0.5, 0.05
-#t_sm, t_ss, t_sp = 0.05, 0.9, 0.05
-#t_pm, t_ps, t_pp = 0.05, 0.5, 0.45
-
-T = np.log(np.array( [[t_mm, t_ms, t_mp],[t_sm, t_ss, t_sp],[t_pm, t_ps, t_pp]]))
-#p_m, p_s,p_p = 0.9, 0.5, 0.1
-p_m, p_s,p_p = 0.8, 0.5, 0.2
-p = [p_m, p_s,p_p]
-
-#intial prob
-I_s=0.5
-I_m=0.25
-I_p=0.25
-
-
 # emmision
 binomlogpmf_dic={}
 def get_emission_log_prob(x,n,p):
@@ -175,7 +142,27 @@ def em_interate(T, p, x=mat, n=total):
     return np.log(new_T), new_P, p_Y_f
 
 
-def em_interate_multiple_input(T, p, x_list, n=_list):
+def em_interate_Tfixed(T, p, x=mat, n=total):
+    t = time.time()
+    f_p_m, p_Y_f = forward_probability_calculation(x, n, p, T)
+    print "forward: ", t- time.time()
+    b_p_m, p_Y_b = backward_probability_calculation(x, n, p, T)
+    print "backward: ", t- time.time()
+    
+    #local P(Y)
+    p_Y_l = np.full((1, len(x)), float('-inf'))
+    for i in xrange(len(x)):
+        p_Y_l[0,i] = sumLogProb(sumLogProb(b_p_m[0,i]+f_p_m[0,i], b_p_m[1,i]+f_p_m[1, i]),b_p_m[2, i]+f_p_m[2, i])
+    print "p_Y_l ", t- time.time()
+    new_P = [None, None, None] #P_m, P_s, P_p 
+    for k in range(3):
+        new_P[k] = np.sum(np.exp(f_p_m[k,] + b_p_m[k,]-p_Y_l) * x ) / np.sum(np.exp(f_p_m[k,] + b_p_m[k,]-p_Y_l) * n ) 
+    #new_p_Y_f = forward_probability_calculation(p= new_P, T=np.log(new_T))[1]
+    print "secs: ", t- time.time()
+    print new_P, p_Y_f
+    return new_P, p_Y_f
+
+def em_interate_multiple_input_not_finished_yet (T, p, x_list, n=_list):
     t = time.time()
     for x in x_list:
         f_p_m, p_Y_f = forward_probability_calculation(x, n, p, T)
@@ -210,73 +197,13 @@ def em_interate_multiple_input(T, p, x_list, n=_list):
 
 
 def make_em_plot(em_p_Y_f_list, t, file_name='em_p_Y_f_list_plot.pdf', i=0):
+    # i is the number of iteration
     plt.plot(xrange(i, len(em_p_Y_f_list)),em_p_Y_f_list[i:])
     plt.xlabel('# of iteration')
     plt.ylabel('log likelihood')
     plt.title(t)
     plt.savefig(file_name)
     plt.close()
-
-
-#def em(T ,p , threshold = 0.01, max_iter=10):
-new_T, new_P, p_Y_f = em_interate(T, p, x=mat, n=total)
-p_Y_f_list = [p_Y_f]
-#p_Y_f += 10
-max_iter = 70
-for i in xrange(max_iter):
-    print i
-    #if p_Y_f - p_Y_f_list[i] > threshold:
-    new_T, new_P, p_Y_f = em_interate(new_T, new_P, x=mat, n=total)
-    p_Y_f_list.append(p_Y_f)
-#print 'Start u = %.2f, theta_h = %.2f, theta_l = %.2f , the final u = %f, theta_h = %f, and theta_l = %f' %(u, theta_h, theta_l, new_u, new_theta_h, new_theta_l)
-#return new_T, new_P, p_Y_f_list
-
-make_em_plot(p_Y_f_list,"count_min=3", 'em_p_Y_f_list_plot_count_min=3.pdf')
-make_em_plot(p_Y_f_list[5:],"count_min=3",'em_p_Y_f_list_plot_count_min=3_20.pdf' ,20)
-
-
-
-
-
-f_int = "counts_plus_hmm.txt"
-#f_int = "counts_plus_noX.txt"
-data = np.loadtxt(f_int, dtype=str ,delimiter='\t', usecols=range(0,6), skiprows=1)
-chrom = np.loadtxt(f_int, dtype=int ,delimiter='\t', usecols=[0], skiprows=1)
-snppos= np.loadtxt(f_int, dtype=int ,delimiter='\t', usecols=[1], skiprows=1)
-mat  = np.loadtxt(f_int, dtype=int ,delimiter='\t', usecols=[2], skiprows=1)
-total = np.loadtxt(f_int, dtype=int ,delimiter='\t', usecols=[4], skiprows=1)
-state = np.loadtxt(f_int, dtype=str ,delimiter='\t', usecols=[5], skiprows=1)
-n_state = np.full(len(state), int(3), dtype=int)
-n_state[state=="M"] = 0
-n_state[state=="S"] = 1
-n_state[state=="P"] = 2
-
-v_path=[]
-
-for i in xrange(1,20):
-    t_c = total[chrom == i]
-    x_c = mat[chrom == i]
-    #snp_c = snppos[chrom == i]
-    v_path += (list(viterbi (x=x_c, n=t_c, p=new_P, T=new_T)))
-
-    
-
-snppos_dic={}
-for i in xrange(1,20):
-    snppos_dic[i]=[]
-    snp_c = snppos[chrom == i]
-    temp=[snp_c[0]]
-    for l in xrange(1,len(snp_c)):
-        if snp_c[l]-snp_c[l-1] > 1000:
-            snppos_dic[i].append(temp)
-            temp=[snp_c[l]]
-        else:
-            temp.append(snp_c[l])
-
-length_list=[]
-for i in xrange(1,20):
-    for s in snppos_dic[i]:
-        length_list.append(len(s))
 
 
 def hist(x, b=50, output_name = 'hist.pdf'):
@@ -287,28 +214,122 @@ def hist(x, b=50, output_name = 'hist.pdf'):
     plt.savefig(output_name)
     plt.close()
 
-            
-        
-        
-        
-    
+
+###structure of hmm
+
+##intial prob
+I_s=0.5
+I_m=0.25
+I_p=0.25
+
+##transition
+# 0,1,2 = M, S, P
+t_mm, t_ms, t_mp = 0.8, 0.1, 0.1
+t_sm, t_ss, t_sp = 0.1, 0.8, 0.1
+t_pm, t_ps, t_pp = 0.1, 0.1, 0.8
+#t_mm, t_ms, t_mp = 0.45, 0.5, 0.05
+#t_sm, t_ss, t_sp = 0.05, 0.9, 0.05
+#t_pm, t_ps, t_pp = 0.05, 0.5, 0.45
+
+T = np.log(np.array( [[t_mm, t_ms, t_mp],[t_sm, t_ss, t_sp],[t_pm, t_ps, t_pp]]))
+
+## emmision
+p_m, p_s,p_p = 0.9, 0.5, 0.1
+#p_m, p_s,p_p = 0.8, 0.5, 0.2
+p = [p_m, p_s,p_p]
+
+
+### input data for training
+# comnined all autosome
+# combined plus trand and minus strand
+
+f_int = "counts_hmm.txt"
+#data
+mat  = np.loadtxt(f_int, dtype=int ,delimiter='\t', usecols=[2], skiprows=1)
+total = np.loadtxt(f_int, dtype=int ,delimiter='\t', usecols=[4], skiprows=1)
+state = np.loadtxt(f_int, dtype=str ,delimiter='\t', usecols=[5], skiprows=1)
+n_state = np.full(len(state), int(3), dtype=int)
+n_state[state=="M"] = 0
+n_state[state=="S"] = 1
+n_state[state=="P"] = 2
+
+### run em
+#def em(T ,p , threshold = 0.01, max_iter=10):
+new_T, new_P, p_Y_f = em_interate(T, p, x=mat, n=total)
+p_Y_f_list = [p_Y_f]
+max_iter = 70
+for i in xrange(max_iter):
+    print i
+    new_T, new_P, p_Y_f = em_interate(new_T, new_P, x=mat, n=total)
+    p_Y_f_list.append(p_Y_f)
+#return new_T, new_P, p_Y_f_list
+make_em_plot(p_Y_f_list,"count_min=1", 'em_p_Y_f_list_plot_count_min=1.pdf')
+make_em_plot(p_Y_f_list, "count_min=1",'em_p_Y_f_list_plot_count_min=1_50.pdf' ,50)
+
+### run em with T fixed
+new_P, p_Y_f = em_interate_Tfixed(T, p, x=mat, n=total)
+p_Y_f_list = [p_Y_f]
+max_iter = 70
+for i in xrange(max_iter):
+    print i
+    new_P, p_Y_f = em_interate_Tfixed(T, new_P, x=mat, n=total)
+    p_Y_f_list.append(p_Y_f)
+#return new_T, new_P, p_Y_f_list
+make_em_plot(p_Y_f_list,"count_min=1", 'em_p_Y_f_list_plot_count_min=1.pdf')
+make_em_plot(p_Y_f_list, "count_min=1",'em_p_Y_f_list_plot_count_min=1_50.pdf' ,50)
+
+
+### input data for viterbi
+# seperate the autosome
+# seperate plus and minus strand
+f_v = "counts_plus_hmm.txt"
+#f_int = "counts_plus_noX.txt"
+data_v = np.loadtxt(f_v, dtype=str ,delimiter='\t', usecols=range(0,6), skiprows=1)
+chrom_v = np.loadtxt(f_v, dtype=int ,delimiter='\t', usecols=[0], skiprows=1)
+snppos_v = np.loadtxt(f_v, dtype=int ,delimiter='\t', usecols=[1], skiprows=1)
+mat_v  = np.loadtxt(f_v, dtype=int ,delimiter='\t', usecols=[2], skiprows=1)
+total_v = np.loadtxt(f_v, dtype=int ,delimiter='\t', usecols=[4], skiprows=1)
+state_v = np.loadtxt(f_v, dtype=str ,delimiter='\t', usecols=[5], skiprows=1)
+n_state_v = np.full(len(state_v), int(3), dtype=int)
+n_state_v[state_v=="M"] = 0
+n_state_v[state_v=="S"] = 1
+n_state_v[state_v=="P"] = 2
+
+v_path=[]
+
+for i in xrange(1,20):
+    t_c = total_v[chrom_v == i]
+    x_c = mat_v[chrom_v == i]
+    #snp_c = snppos[chrom == i]
+    v_path += (list(viterbi (x=x_c, n=t_c, p=new_P, T=new_T)))
+
 state_map = {0:'M', 1:'S', 2:'P'}
-with open(f_int[0:-4]+'_out.txt', 'w') as out:
+with open(f_v[0:-4]+'_out.txt', 'w') as out:
     out.write("\t".join(['chrm','snppos','mat_allele_count','pat_allele_count','total_reads_count','state', 'hmm_state', 'hmm_post_m', 'hmm_post_s','hmm_post_p']))
     out.write("\n")
     for i in xrange(len(v_path)):
-        out.write("\t".join(list(data[i])+[state_map[v_path[i]]]))
+        out.write("\t".join(list(data_v[i])+[state_map[v_path[i]]]))
         out.write("\n")
 
 
-plt.plot(snppos[0:1000], n_state[0:1000], color='b')
-plt.plot(snppos[0:1000], v_path[0:1000], color='red')
-plt.scatter(snppos[0:1000], v_path[0:1000], s=10)
+def viterbi_path_forward_snppos(start, end):
+    plt.plot(snppos_v[start:end], v_path[start:end], color='red')
+    plt.plot(snppos_v[start:end], n_state_v[start:end], color='b')
+    plt.scatter(snppos_v[start:end], v_path[start:end], s=10)
+    plt.ylim(-0.5, 2.5)
+    plt.xlabel('snppos')
+    plt.savefig('viterbi_path_forward_snppos_'+str(start)+'-'+str(end)+'.pdf')
+    plt.close()
+
+viterbi_path_forward_snppos(1000, 2000)
+
+plt.plot(snppos_v[1000:2000], v_path[0:1000], color='red')
+plt.plot(snppos_v[0:1000], n_state_v[0:1000], color='b')
+plt.scatter(snppos_v[0:1000], v_path[0:1000], s=10)
 plt.ylim(-0.5, 2.5)
 plt.xlabel('snppos')
 plt.savefig('viterbi_path_forward_snppos_0-1000.pdf')
 plt.close()
-
 
 
 
