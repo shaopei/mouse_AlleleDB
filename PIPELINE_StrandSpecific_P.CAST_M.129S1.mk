@@ -6,6 +6,7 @@ BNDS:=hits.bed
 MAPS:=$(BASE)/mouse_AlleleSpecific/mouse_genome.sanger.ac.uk/REL-1505-SNPs_Indels/PersonalGenome_P.CAST_M.129S1_indelsNsnps_CAST.subsample.bam/%s_P.CAST.EiJ_M.129S1.SvImJ.map
 FDR_SIMS:=5
 FDR_CUTOFF:=0.1
+MIN_READ_COUNT :=1
 
 PREFIX:=NULL
 
@@ -16,45 +17,37 @@ countfiles_minus:=$(PREFIX).minus.cnt
 ## bowtie files that contain aligned reads
 MATBOWTIE:=$(PREFIX).mat.bowtie
 PATBOWTIE:=$(PREFIX).pat.bowtie
+MergedBOWTIE_PLUS:=$(PREFIX).merged.bowtie_plus
+MergedBOWTIE_MINUS:=$(PREFIX).merged.bowtie_minus
 
-MATBOWTIE_PLUS:=$(PREFIX).mat.bowtie_plus
-PATBOWTIE_PLUS:=$(PREFIX).pat.bowtie_plus
-MATBOWTIE_MINUS:=$(PREFIX).mat.bowtie_minus
-PATBOWTIE_MINUS:=$(PREFIX).pat.bowtie_minus
 
 ## file that contains read IDs to be removed from bowtie files above
 READS2FILTER:=originalmatpatreads.toremove.ids
 
 target:interestingHets_plus.txt
 
-#Generate Strand Specific bowtie output
-
-$(PATBOWTIE_PLUS):$(PATBOWTIE_MINUS)
-$(PATBOWTIE_MINUS):$(PATBOWTIE)
-	python $(PL)/filter_reads_out.py $(PATBOWTIE) - $(READS2FILTER) | python ${PL}/seperate_strand_of_bowtie_output_alleleDB.py $(PATBOWTIE)
-
-$(MATBOWTIE_PLUS):$(MATBOWTIE_MINUS)
-$(MATBOWTIE_MINUS):$(MATBOWTIE)
-	python $(PL)/filter_reads_out.py $(MATBOWTIE) - $(READS2FILTER) | python ${PL}/seperate_strand_of_bowtie_output_alleleDB.py $(MATBOWTIE) 
-
-
-$(countfiles_plus): $(PATBOWTIE_PLUS) $(MATBOWTIE_PLUS)
+#Generate Strand Specific countfiles output
+$(MergedBOWTIE_PLUS): $(PATBOWTIE) $(MATBOWTIE) $(READS2FILTER)
 	bash -c "python $(PL)/MergeBowtie.py \
-           $(PATBOWTIE_PLUS) $(MATBOWTIE_PLUS) \
-           $(MAPS) | python $(PL)/SnpCounts.py $(SNPS) - $(MAPS) $@"
+           <(python $(PL)/filter_reads_out.py $(PATBOWTIE) - $(READS2FILTER)) \
+           <(python $(PL)/filter_reads_out.py $(MATBOWTIE) - $(READS2FILTER)) \
+           $(MAPS) | python ${PL}/seperate_strand_of_bowtie_output_alleleDB.py $(PREFIX).merged.bowtie"
 
-$(countfiles_minus): $(PATBOWTIE_MINUS) $(MATBOWTIE_MINUS)
-	bash -c "python $(PL)/MergeBowtie.py \
-           $(PATBOWTIE_MINUS) $(MATBOWTIE_MINUS) \
-           $(MAPS) | python $(PL)/SnpCounts.py $(SNPS) - $(MAPS) $@"
+$(countfiles_plus): $(MergedBOWTIE_PLUS)
+	bash -c "python $(PL)/SnpCounts.py $(SNPS) $(MergedBOWTIE_PLUS) $(MAPS) $@"
+
+$(MergedBOWTIE_MINUS): $(MergedBOWTIE_PLUS)
+$(countfiles_minus): $(MergedBOWTIE_MINUS)
+	bash -c "python $(PL)/SnpCounts.py $(SNPS) $(MergedBOWTIE_MINUS) $(MAPS) $@"
+
 
 check:
 	@echo $(sourcefiles)
 
 
 counts_plus.txt: $(countfiles_plus) $(countfiles_minus)
-	python $(PL)/CombineSnpCounts.py 5 $(SNPS) $(BNDS) $(CNVS) counts_plus.txt counts_plus.log $(countfiles_plus)
-	python $(PL)/CombineSnpCounts.py 5 $(SNPS) $(BNDS) $(CNVS) counts_minus.txt counts_minus.log $(countfiles_minus)
+	python $(PL)/CombineSnpCounts.py $(MIN_READ_COUNT) $(SNPS) $(BNDS) $(CNVS) counts_plus.txt counts_plus.log $(countfiles_plus)
+	python $(PL)/CombineSnpCounts.py $(MIN_READ_COUNT) $(SNPS) $(BNDS) $(CNVS) counts_minus.txt counts_minus.log $(countfiles_minus)
 
 # calculate false discovery rates
 FDR_plus.txt: counts_plus.txt
