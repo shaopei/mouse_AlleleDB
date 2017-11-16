@@ -23,6 +23,12 @@ def get_max_argmax(l):
     a = l.index(m)
     return m, a
 
+binomtest_dic={}
+def binomtest(x, n, p):
+    if (x,n,p) not in binomtest_dic:
+        binomtest_dic[(x,n,p)] = scipy.stats.binom_test(x, n, p)
+    return binomtest_dic[(x,n,p)]
+
 def viterbi (p, T, x=mat, n=total):
     v = np.full((3, len(x)), float('-inf'))
     b = np.full((3, len(x)), int(3), dtype=int)
@@ -162,39 +168,6 @@ def em_interate_Tfixed(T, p, x=mat, n=total):
     print new_P, p_Y_f
     return new_P, p_Y_f
 
-def em_interate_multiple_input_not_finished_yet (T, p, x_list, n=_list):
-    t = time.time()
-    for x in x_list:
-        f_p_m, p_Y_f = forward_probability_calculation(x, n, p, T)
-        print "forward: ", t- time.time()
-        b_p_m, p_Y_b = backward_probability_calculation(x, n, p, T)
-        print "backward: ", t- time.time()
-        
-        #local P(Y)
-        p_Y_l = np.full((1, len(x)), float('-inf'))
-        for i in xrange(len(x)):
-            p_Y_l[0,i] = sumLogProb(sumLogProb(b_p_m[0,i]+f_p_m[0,i], b_p_m[1,i]+f_p_m[1, i]),b_p_m[2, i]+f_p_m[2, i])
-        print "p_Y_l ", t- time.time()
-    #A = [[None, None, None], [None, None, None], [None, None, None]]
-    A = np.zeros((3,3))
-    new_P = [None, None, None] #P_m, P_s, P_p 
-    
-    # can add multiple sequence
-    for i in xrange(len(x)-1):
-        for k in range(3):
-            for l in range(3):
-                A[k,l] = A[k,l] + exp(f_p_m[k, i] + T[k,l] + get_emission_log_prob(x[i+1],n[i+1],p[l]) + b_p_m[l, i+1] - p_Y_l[0,i])
-    #A = np.array(A)
-    print "A : ", t- time.time()
-    new_T = np.zeros((3,3))
-    for k in range(3):
-        new_P[k] = np.sum(np.exp(f_p_m[k,] + b_p_m[k,]-p_Y_l) * x ) / np.sum(np.exp(f_p_m[k,] + b_p_m[k,]-p_Y_l) * n ) 
-        new_T[k] = A[k]/A[k].sum()
-    #new_p_Y_f = forward_probability_calculation(p= new_P, T=np.log(new_T))[1]
-    print "secs: ", t- time.time()
-    print new_T, new_P, p_Y_f
-    return np.log(new_T), new_P, p_Y_f
-
 
 def make_em_plot(em_p_Y_f_list, t, file_name='em_p_Y_f_list_plot.pdf', i=0):
     # i is the number of iteration
@@ -275,53 +248,121 @@ for i in xrange(max_iter):
     new_P, p_Y_f = em_interate_Tfixed(T, new_P, x=mat, n=total)
     p_Y_f_list.append(p_Y_f)
 #return new_T, new_P, p_Y_f_list
-make_em_plot(p_Y_f_list,"count_min=1", 'em_p_Y_f_list_plot_count_min=1.pdf')
-make_em_plot(p_Y_f_list, "count_min=1",'em_p_Y_f_list_plot_count_min=1_50.pdf' ,50)
+make_em_plot(p_Y_f_list,"count_min=1 T fixed", 'em_p_Y_f_list_plot_count_min=1_Tfixed.pdf')
+make_em_plot(p_Y_f_list, "count_min=1 T fixed", 'em_p_Y_f_list_plot_count_min=1_Tfixed_50.pdf' ,50)
 
 
 ### input data for viterbi
 # seperate the autosome
 # seperate plus and minus strand
-f_v = "counts_plus_hmm.txt"
-#f_int = "counts_plus_noX.txt"
-data_v = np.loadtxt(f_v, dtype=str ,delimiter='\t', usecols=range(0,6), skiprows=1)
-chrom_v = np.loadtxt(f_v, dtype=int ,delimiter='\t', usecols=[0], skiprows=1)
-snppos_v = np.loadtxt(f_v, dtype=int ,delimiter='\t', usecols=[1], skiprows=1)
-mat_v  = np.loadtxt(f_v, dtype=int ,delimiter='\t', usecols=[2], skiprows=1)
-total_v = np.loadtxt(f_v, dtype=int ,delimiter='\t', usecols=[4], skiprows=1)
-state_v = np.loadtxt(f_v, dtype=str ,delimiter='\t', usecols=[5], skiprows=1)
-n_state_v = np.full(len(state_v), int(3), dtype=int)
-n_state_v[state_v=="M"] = 0
-n_state_v[state_v=="S"] = 1
-n_state_v[state_v=="P"] = 2
+def hmm_prediction(f_v, strand):
+    #f_v = "counts_plus_hmm.txt"
+    data_v = np.loadtxt(f_v, dtype=str ,delimiter='\t', usecols=range(0,6), skiprows=1)
+    chrom_v = np.loadtxt(f_v, dtype=int ,delimiter='\t', usecols=[0], skiprows=1)
+    snppos_v = np.loadtxt(f_v, dtype=int ,delimiter='\t', usecols=[1], skiprows=1)
+    mat_v  = np.loadtxt(f_v, dtype=int ,delimiter='\t', usecols=[2], skiprows=1)
+    total_v = np.loadtxt(f_v, dtype=int ,delimiter='\t', usecols=[4], skiprows=1)
+    state_v = np.loadtxt(f_v, dtype=str ,delimiter='\t', usecols=[5], skiprows=1)
+    n_state_v = np.full(len(state_v), int(3), dtype=int)
+    n_state_v[state_v=="M"] = 0
+    n_state_v[state_v=="S"] = 1
+    n_state_v[state_v=="P"] = 2
+    
+    v_path=[]
+    #v_path_Tfixed=[]
+    
+    for i in xrange(1,20):
+        t_c = total_v[chrom_v == i]
+        x_c = mat_v[chrom_v == i]
+        #snp_c = snppos[chrom == i]
+        v_path += (list(viterbi (x=x_c, n=t_c, p=new_P, T=new_T)))
+        #v_path_Tfixed += (list(viterbi (x=x_c, n=t_c, p=new_P, T=T)))
+    
+    # output regions with neighbor sharing the same states as a bed file
+    region_list=[]
+    for c in xrange(1,20):
+        snppos_c = snppos_v[chrom_v == c]
+        v_path_c = np.array(v_path)[chrom_v == c]
+        u = snppos_c[0]
+        for l in xrange(1,len(v_path_c)):
+            if v_path_c[l] != v_path_c[l-1]:
+                v = snppos_c[l-1]
+                region_list.append([str(c), str(u-1), str(v)])
+                u = snppos_c[l]
+        region_list.append([str(c), str(u-1), str(snppos_c[-1])])
+    
+    with open(f_v[0:-4]+'_regions.bed', 'w') as out:
+        for r in region_list:
+            out.write('\t'.join(r+["","",strand]))
+            out.write('\n')
+        
+hmm_prediction("counts_plus_hmm.txt", "+")
+hmm_prediction("counts_minus_hmm.txt", "-")
 
-v_path=[]
 
+
+# add a binomial test after hmm
+continue_count_list=[]
+x_sub_list=[]
+t_sub_list=[]
+p_value_list=[]
+v_path_binomtest=[]
 for i in xrange(1,20):
     t_c = total_v[chrom_v == i]
     x_c = mat_v[chrom_v == i]
-    #snp_c = snppos[chrom == i]
-    v_path += (list(viterbi (x=x_c, n=t_c, p=new_P, T=new_T)))
+    v_path_c = np.array(v_path)[chrom_v == i]
+    x_sub, t_sub = x_c[0], t_c[0]
+    continue_count=1
+    x_sub_list.append(x_sub)
+    t_sub_list.append(t_sub)
+    continue_count_list.append(continue_count)
+    for l in xrange(1,len(v_path_c)):
+        if v_path_c[l] != v_path_c[l-1]:
+            p_value = binomtest(x_sub, t_sub, 0.5)
+            #for i in range(continue_count):
+            p_value_list += [p_value]*continue_count
+            if p_value <= 0.05:
+                 v_path_binomtest += [v_path_c[l-1]]*continue_count
+            else:
+                v_path_binomtest += [1]*continue_count
+            x_sub = x_c[l]
+            t_sub = t_c[l]
+            continue_count=1
+        else:
+            x_sub += x_c[l]
+            t_sub += t_c[l]
+            continue_count += 1
+        x_sub_list.append(x_sub)
+        t_sub_list.append(t_sub)
+        continue_count_list.append(continue_count)
+    p_value = binomtest(x_sub, t_sub, 0.5)
+    p_value_list.append(p_value)
+    if p_value <= 0.05:
+        v_path_binomtest += [v_path_c[l-1]]*continue_count
+    else:
+        v_path_binomtest += [1]*continue_count
+    
+
 
 state_map = {0:'M', 1:'S', 2:'P'}
 with open(f_v[0:-4]+'_out.txt', 'w') as out:
-    out.write("\t".join(['chrm','snppos','mat_allele_count','pat_allele_count','total_reads_count','state', 'hmm_state', 'hmm_post_m', 'hmm_post_s','hmm_post_p']))
+    out.write("\t".join(['chrm','snppos','mat_allele_count','pat_allele_count','total_reads_count','state','hmm+BinomialTest', 'hmm_state', 'hmm_post_m', 'hmm_post_s','hmm_post_p']))
     out.write("\n")
     for i in xrange(len(v_path)):
-        out.write("\t".join(list(data_v[i])+[state_map[v_path[i]]]))
+        out.write("\t".join(list(data_v[i])+[state_map[v_path_binomtest[i]]]+[state_map[v_path[i]]]))
         out.write("\n")
 
 
-def viterbi_path_forward_snppos(start, end):
+def viterbi_path_forward_snppos(v_path, start, end, file_head='viterbi_path_forward_snppos_'):
     plt.plot(snppos_v[start:end], v_path[start:end], color='red')
     plt.plot(snppos_v[start:end], n_state_v[start:end], color='b')
     plt.scatter(snppos_v[start:end], v_path[start:end], s=10)
     plt.ylim(-0.5, 2.5)
     plt.xlabel('snppos')
-    plt.savefig('viterbi_path_forward_snppos_'+str(start)+'-'+str(end)+'.pdf')
+    plt.savefig(file_head+str(start)+'-'+str(end)+'.pdf')
     plt.close()
 
-viterbi_path_forward_snppos(1000, 2000)
+viterbi_path_forward_snppos(v_path_binomtest, 1000, 2000, 'v_path_binomtest_snppos_')
 
 plt.plot(snppos_v[1000:2000], v_path[0:1000], color='red')
 plt.plot(snppos_v[0:1000], n_state_v[0:1000], color='b')
@@ -332,20 +373,8 @@ plt.savefig('viterbi_path_forward_snppos_0-1000.pdf')
 plt.close()
 
 
-
-
-def run():
-    new_T, new_P, p_Y_f_list = em(T ,p ,threshold = 0.01, max_iter=100)
-
     
-def main():
-    
-#q1_a
-    v_path = viterbi (x=mat, n=total, p=p, T=T)
-    plt.plot(np.arange(0,500), n_state[0:500], color='b')
-    plt.plot(np.arange(0,500), v_path[0:500], color='red')
-    plt.savefig('viterbi_path_forward.pdf')
-    
+def XXXX():
 #q1_b
     f_p_m, p_Y_f = forward_probability_calculation(x=mat, n=total, p=p, T=T)
     b_p_m, p_Y_b = backward_probability_calculation(x=mat, n=total, p=p, T=T)
@@ -371,38 +400,8 @@ def main():
     plt.close()
     
 
-    
-#q2_a
-    real_interval=np.array([(66,417),(468,509),(527,728),(946,1000)])-1
-    Cb = len(real_interval)*2 -1
-    Cs = 1000 -1 -Cb
-    Seq_h =[]
-    for u, v in real_interval:
-        Seq_h.append(Seq[u:v+1])
-    Seq_h = ('').join(Seq_h)
-    d_hG = Seq_h.count('G') + Seq_h.count('C')
-    d_hA = Seq_h.count('A') + Seq_h.count('T')
-    d_lG = Seq.count('G') + Seq.count('C') - d_hG
-    d_lA = Seq.count('A') + Seq.count('T') - d_hA
-#q3_a
-    em_u, em_theta_h, em_theta_l, em_p_Y_f_list = em()
-    plt.plot(xrange(len(em_p_Y_f_list)),em_p_Y_f_list)
-    plt.xlabel('# of iteration')
-    plt.ylabel('log likelihood')
-    plt.savefig('pset3_sc2457_q3a_plot.pdf')
-    #plt.show()
-    plt.close()
-#q3_b
-    make_em_plot(em(Seq=Seq, threshold = 0.01, u = 0.5, theta_h = 0.6, theta_l = 0.4)[-1], 1, 'Start u = 0.5, theta_h = 0.6, theta_l = 0.4')
-    make_em_plot(em(Seq=Seq, threshold = 0.01, u = 0.6, theta_h = 0.6, theta_l = 0.4)[-1], 2, 'Start u = 0.6, theta_h = 0.6, theta_l = 0.4')
-    make_em_plot(em(Seq=Seq, threshold = 0.01, u = 0.2, theta_h = 0.8, theta_l = 0.2)[-1], 3, 'Start u = 0.2, theta_h = 0.8, theta_l = 0.2')
-    make_em_plot(em(Seq=Seq, threshold = 0.01, u = 0.000001, theta_h = 0.8, theta_l = 0.2)[-1], 4, 'Start u = 0.000001, theta_h = 0.8, theta_l = 0.2')
-    make_em_plot(em(Seq=Seq, threshold = 0.01, u = 0.7, theta_h = 0.8, theta_l = 0.2)[-1], 5, 'Start u = 0.7, theta_h = 0.8, theta_l = 0.2')
-    make_em_plot(em(Seq=Seq, threshold = 0.01, u = 0.7, theta_h = 0.6, theta_l = 0.4)[-1], 6, 'Start u = 0.7, theta_h = 0.6, theta_l = 0.4')
-    make_em_plot(em(Seq=Seq, threshold = 0.01, u = 0.7, theta_h = 0.7, theta_l = 0.3)[-1], 7, 'Start u = 0.7, theta_h = 0.7, theta_l = 0.3')
-    make_em_plot(em(Seq=Seq, threshold = 0.01, u = 0.5, theta_h = 0.55, theta_l = 0.45)[-1], 9, 'Start u = 0.5, theta_h = 0.55, theta_l = 0.45')
 
 
-if __name__ == '__main__':
-    run()
+#if __name__ == '__main__':
+#    run()
     
