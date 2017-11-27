@@ -1,0 +1,131 @@
+# http://epigenomegateway.wustl.edu/browser/?genome=mm10&datahub=ftp://cbsuftp.tc.cornell.edu/danko/hub/sc2457/germ_cell_mm10/trackDb.json
+# Example here: http://vizhub.wustl.edu/hubSample/hg19/hub.json
+#
+[
+# Note: Epigenome browser does not seem to support bigBed: 
+## PRO-seq F1 hybrid
+{
+  type:"bigwig",
+  url:"ftp://cbsuftp.tc.cornell.edu/danko/hub/sc2457/germ_cell_mm10/LEP_ZYG_ATGCA_plus.bw",
+  name: "F1 Hybrid, Leptotene/ Zygotene, GRO-seq Plus (+)",
+  fixedscale:{min:0,max:10},
+  colorpositive:"rgb(197,0,11)",
+  height:50,
+  mode:"show",
+  summarymethod: "max",
+},
+{
+  type:"bigwig",
+  url:"ftp://cbsuftp.tc.cornell.edu/danko/hub/sc2457/germ_cell_mm10/LEP_ZYG_ATGCA_minus.bw",
+  name: "F1 Hybrid, Leptotene/ Zygotene, GRO-seq Minus (-)",
+  fixedscale:{min:-10,max:0},
+  colornegative:"rgb(0,132,209)",
+  height:50,
+  mode:"show",
+  summarymethod: "min",
+},
+{
+  type:"bigwig",
+  url:"ftp://cbsuftp.tc.cornell.edu/danko/hub/sc2457/germ_cell_mm10/PACHY_TCGTA_plus.bw",
+  name: "F1 Hybrid, Pachatyne, GRO-seq Plus (+)",
+  fixedscale:{min:0,max:10},
+  colorpositive:"rgb(197,0,11)",
+  height:50,
+  mode:"show",
+  summarymethod: "max",
+},
+{
+  type:"bigwig",
+  url:"ftp://cbsuftp.tc.cornell.edu/danko/hub/sc2457/germ_cell_mm10/PACHY_TCGTA_minus.bw",
+  name: "F1 Hybrid, Pachatyne, GRO-seq Minus (-)",
+  fixedscale:{min:-10,max:0},
+  colornegative:"rgb(0,132,209)",
+  height:50,
+  mode:"show",
+  summarymethod: "min",
+},
+{
+  type:"bigwig",
+  url:"ftp://cbsuftp.tc.cornell.edu/danko/hub/sc2457/germ_cell_mm10/DIPLO_CGATA_plus.bw",
+  name: "F1 Hybrid, Diplotyne, GRO-seq Plus (+)",
+  fixedscale:{min:0,max:10},
+  colorpositive:"rgb(197,0,11)",
+  height:50,
+  mode:"show",
+  summarymethod: "max",
+},
+{
+  type:"bigwig",
+  url:"ftp://cbsuftp.tc.cornell.edu/danko/hub/sc2457/germ_cell_mm10/DIPLO_CGATA_minus.bw",
+  name: "F1 Hybrid, Diplotyne, GRO-seq Minus (-)",
+  fixedscale:{min:-10,max:0},
+  colornegative:"rgb(0,132,209)",
+  height:50,
+  mode:"show",
+  summarymethod: "min",
+},
+{
+  type:"bigwig",
+  url:"ftp://cbsuftp.tc.cornell.edu/danko/hub/sc2457/germ_cell_mm10/SPERM_GTCAA_plus.bw",
+  name: "F1 Hybrid, Sperm, GRO-seq Plus (+)",
+  fixedscale:{min:0,max:10},
+  colorpositive:"rgb(197,0,11)",
+  height:50,
+  mode:"show",
+  summarymethod: "max",
+},
+{
+  type:"bigwig",
+  url:"ftp://cbsuftp.tc.cornell.edu/danko/hub/sc2457/germ_cell_mm10/SPERM_GTCAA_minus.bw",
+  name: "F1 Hybrid, Sperm, GRO-seq Minus (-)",
+  fixedscale:{min:-10,max:0},
+  colornegative:"rgb(0,132,209)",
+  height:50,
+  mode:"show",
+  summarymethod: "min",
+},
+## bed files from hmm
+#bgzip LEP_ZYG_ATGCA_minus_hmm_regions_fdr0.1.bed
+#tabix -p bed LEP_ZYG_ATGCA_minus_hmm_regions_fdr0.1.bed.gz
+{
+  type:"bed",
+  url: "ftp://cbsuftp.tc.cornell.edu/danko/hub/sc2457/germ_cell_mm10/LEP_ZYG_ATGCA_plus_hmm_regions_fdr0.1.bed.gz",
+  name: "F1 Hybrid, LZ, Plus (+), hmm, Binomial FDR < 0.1",
+  colorpositive:"rgb(197,0,11)",
+  mode: "show",
+},
+{
+  type:"bed",
+  url: "ftp://cbsuftp.tc.cornell.edu/danko/hub/sc2457/germ_cell_mm10/LEP_ZYG_ATGCA_minus_hmm_regions_fdr0.1.bed.gz",
+  name: "F1 Hybrid, LZ, Minus (-), hmm, Binomial FDR < 0.1",
+  colornegative:"rgb(0,132,209)",
+  mode: "show",
+},
+{
+  type:"bed",
+  url: "ftp://cbsuftp.tc.cornell.edu/danko/hub/sc2457/germ_cell_mm10/test.bed.gz",
+  name: "test minus",
+  colornegative:"rgb(0,132,209)",
+  mode: "show",
+},
+{
+  type:"bed",
+  url: "ftp://cbsuftp.tc.cornell.edu/danko/hub/sc2457/germ_cell_mm10/test2.bed.gz",
+  name: "test2 plus",
+  colorpositive:"rgb(197,0,11)",
+  mode: "show",
+},
+{
+  type:"bed",
+  url: "ftp://cbsuftp.tc.cornell.edu/danko/hub/sc2457/germ_cell_mm10/test3.bed.gz",
+  name: "test3 plus",
+  colorpositive:"rgb(197,0,11)",
+  mode: "show",
+},
+# a pack of native tracks (supplied by the browser server)
+{
+type:"native_track",list:[
+	{name:"refGene",mode:"full"},
+	],
+},
+]
