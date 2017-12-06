@@ -1,0 +1,78 @@
+PL=/workdir/sc2457/alleleDB/alleledb_pipeline_mouse
+MAPS=/workdir/sc2457/mouse_AlleleSpecific/mouse_genome.sanger.ac.uk/REL-1505-SNPs_Indels/PersonalGenome_P.CAST_M.B6_indelsNsnps_CAST.bam/%s_P.CAST.EiJ_M.C57BL.6J.map
+PREFIX=LEP_ZYG_ATGCA_forAlleleDB
+MATBOWTIE=${PREFIX}.mat.bowtie
+PATBOWTIE=${PREFIX}.pat.bowtie
+FDR_SIMS=10
+FDR_CUTOFF=0.1
+MODIFIER=TmpFixed
+
+for f in counts_*_hmm_regions.bed;
+	do j=`echo $f| cut -d \. -f 1`
+bedtools coverage -a $f -b ${MATBOWTIE}_AMBremoved_sorted_specific.map2ref.sorted.bed -s | awk 'BEGIN {OFS="\t"; t="_"} {print $1t$2t$3, $0}' |LC_ALL=C sort -k1,1 --parallel=30 > ${j}.mat_cov.bed &
+bedtools coverage -a $f -b ${PATBOWTIE}_AMBremoved_sorted_specific.map2ref.sorted.bed -s | awk 'BEGIN {OFS="\t"; t="_"} {print $1t$2t$3, $0}' |LC_ALL=C sort -k1,1 --parallel=30 > ${j}.pat_cov.bed &
+wait
+join -t $'\t' -j 1 -o 1.1,1.2,1.3,1.4,1.5,1.8,2.8 ${j}.mat_cov.bed ${j}.pat_cov.bed > ${j}.temp_cov.bed &
+bedtools coverage -a $f -b ${PATBOWTIE}_AMBremoved_sorted_identical.map2ref.sorted.bed -s | awk 'BEGIN {OFS="\t"; t="_"} {print $1t$2t$3, $0}' |LC_ALL=C sort -k1,1 --parallel=30 > ${j}.iden_cov.bed &
+wait
+join -t $'\t' -j 1 -o 1.2,1.3,1.4,1.5,1.6,1.7,2.8 ${j}.temp_cov.bed ${j}.iden_cov.bed | LC_ALL=C sort -k1,1n -k2,2n --parallel=30 > ${j}.merged_cov.bed
+rm ${j}.temp_cov.bed ${j}.mat_cov.bed ${j}.pat_cov.bed ${j}.iden_cov.bed
+python ${PL}/BinomialTestFor_merged_cov.bed.py ${j}.merged_cov.bed ${j}.merged_cov_binomtest.bed
+# output of BinomialTestFor_merged_cov.bed.py: if p-value <= 0.05, remain what it got from hmm (can ne M,P, or S), otherwise S.
+python ${PL}/FalsePosFor_merged_cov.bed.py ${j}.merged_cov_binomtest.bed ${FDR_SIMS} ${FDR_CUTOFF} > ${j}.merged_cov_binomtest_FDR.txt
+
+awk 'NR==1 { print $0 } NR>1 && $9 <= thresh { print $0 }'  thresh=$(awk 'END {print $6}' ${j}.merged_cov_binomtest_FDR.txt) < ${j}.merged_cov_binomtest.bed > ${j}_interestingHets.bed
+done
+
+#make bed for http://epigenomegateway.wustl.edu/
+#FDR < = 0.1
+#Keep what it got from hmm (can be M,P, or S), NOT from binomial test
+cd /local/ftp/pub/hub/sc2457/germ_cell_mm10
+
+
+j=`echo ${PREFIX}| rev| cut -d _ -f 2- |rev`
+cat allelicbias-PersonalGenome_P.CAST_M.B6-${PREFIX}/counts_minus_hmm_regions_interestingHets.bed | awk 'BEGIN {OFS="\t"; t=","; s="-";c="chr"} NR==1 { print $1,$2,$3,$4t$6t$7, 111, s} 
+NR>1 && $4=="P"  {print c$1,$2,$3,$4t$6t$7, 999, s}
+NR>1 && $4=="M"  {print c$1,$2,$3,$4t$6t$7, 111, s}' > ${j}_minus_hmm_regions_fdr0.1_${MODIFIER}.bed
+bgzip ${j}_minus_hmm_regions_fdr0.1_${MODIFIER}.bed -f
+tabix -p bed ${j}_minus_hmm_regions_fdr0.1_${MODIFIER}.bed.gz -f 
+
+cat allelicbias-PersonalGenome_P.CAST_M.B6-${PREFIX}/counts_minus_hmm_regions_interestingHets.bed | awk 'BEGIN {OFS="\t"; t=","; s="-";c="chr"} NR==1 { print $1,$2,$3,$4t$6t$7, 111, s} 
+NR>1 && $4!="S"  {print c$1,$2,$3,$4t$6t$7, 111, s}' > ${j}_minus_hmm_regions_fdr0.1_${MODIFIER}.bed
+bgzip ${j}_minus_hmm_regions_fdr0.1_${MODIFIER}.bed -f
+tabix -p bed ${j}_minus_hmm_regions_fdr0.1_${MODIFIER}.bed.gz -f 
+
+cat allelicbias-PersonalGenome_P.CAST_M.B6-${PREFIX}/counts_plus_hmm_regions_interestingHets.bed | awk 'BEGIN {OFS="\t"; t=","; s="+";c="chr"} NR==1 { print $1,$2,$3,$4t$6t$7, 111, s} 
+NR>1 && $4!="S" {print c$1,$2,$3,$4t$6t$7, 111, s }' \
+> ${j}_plus_hmm_regions_fdr0.1_${MODIFIER}.bed
+bgzip ${j}_plus_hmm_regions_fdr0.1_${MODIFIER}.bed -f
+tabix -p bed ${j}_plus_hmm_regions_fdr0.1_${MODIFIER}.bed.gz -f
+
+cat allelicbias-PersonalGenome_P.CAST_M.B6-${PREFIX}/counts_plus_hmm_regions_interestingHets.bed | awk 'BEGIN {OFS="\t"; t=","; s="+";c="chr"} NR==1 { print $1,$2,$3,$4t$6t$7, 111, s} 
+NR>1 && $4!="S" {print c$1,$2,$3,$4t$6t$7, 111, s }' \
+> test2.bed
+bgzip test2.bed -f
+tabix -p bed test2.bed.gz -f
+
+
+### keep the 5' head of bed files
+zcat ${j}_*_hmm_regions_fdr0.1_${MODIFIER}.bed.gz | awk 'BEGIN {OFS="\t"; t=","; s="-";c="chr"} NR==1 { print $0} 
+NR>1 && $6=="+"  {print $1,$2,$2+1,$4, $5, $6}
+NR>1 && $6=="-"  {print $1,$3-1,$3,$4, $5, $6}' 
+
+# distance to the closet upstream dReg sites -id Ignore features in B that are downstream of features in A.
+# -D a Report distance with respect to A.
+
+bedtools closest -id -D a -a <(zcat ${j}_*_hmm_regions_fdr0.1_${MODIFIER}.bed.gz | awk 'BEGIN {OFS="\t"; t=","; s="-";c="chr"} NR==1 {print $0} 
+NR>1 && $6=="+"  {print $1,$2,$2+1,$4, $5, $6} NR>1 && $6=="-"  {print $1,$3-1,$3,$4, $5, $6}' | LC_ALL=C sort -k1,1 -k2,2n --parallel=30) -b LEP_ZYG_ATGCA.dREG.peak.score.bed.gz \
+|awk '($11<0){print $11*(-1)}; ($11>=0) {print $11}' | LC_ALL=C sort --temporary-directory=/workdir/sc2457/tmp/ --parallel=10 -n | uniq -c >  ${j}_hmm_regions_fdr0.1_${MODIFIER}_distance_toclosest-id-dReg_Counts.txt
+python sum_of_counts.py ${j}_hmm_regions_fdr0.1_${MODIFIER}_distance_toclosest-id-dReg_Counts.txt `awk 'END {print $2}' ${j}_hmm_regions_fdr0.1_${MODIFIER}_distance_toclosest-id-dReg_Counts.txt` > ${j}_hmm_regions_fdr0.1_${MODIFIER}_distance_toclosest-id-dReg_AccumulateCounts.txt 
+
+bedtools closest -D a -a <(zcat ${j}_*_hmm_regions_fdr0.1_${MODIFIER}.bed.gz | awk 'BEGIN {OFS="\t"; t=","; s="-";c="chr"} NR==1 {print $0} 
+NR>1 && $6=="+"  {print $1,$2,$2+1,$4, $5, $6} NR>1 && $6=="-"  {print $1,$3-1,$3,$4, $5, $6}' | LC_ALL=C sort -k1,1 -k2,2n --parallel=30) -b LEP_ZYG_ATGCA.dREG.peak.score.bed.gz \
+|awk '($11<0){print $11*(-1)}; ($11>=0) {print $11}' | LC_ALL=C sort --temporary-directory=/workdir/sc2457/tmp/ --parallel=10 -n | uniq -c >  ${j}_hmm_regions_fdr0.1_${MODIFIER}_distance_toclosest-dReg_Counts.txt
+python sum_of_counts.py ${j}_hmm_regions_fdr0.1_${MODIFIER}_distance_toclosest-dReg_Counts.txt `awk 'END {print $2}' ${j}_hmm_regions_fdr0.1_${MODIFIER}_distance_toclosest-dReg_Counts.txt` > ${j}_hmm_regions_fdr0.1_${MODIFIER}_distance_toclosest-dReg_AccumulateCounts.txt 
+
+
+R --vanilla --slave --args $(pwd) ${PREFIX} < getFigure.R
+
