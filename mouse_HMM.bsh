@@ -114,6 +114,8 @@ done
 
 #
 
+
+##### see mouse_after_HMM_forGenome_browser.bsh for update! ####
 for f in counts_*_hmm_regions.bed;
 	do j=`echo $f| cut -d \. -f 1`
 bedtools coverage -a $f -b ${MATBOWTIE}_AMBremoved_sorted_specific.map2ref.sorted.bed -s | awk 'BEGIN {OFS="\t"; t="_"} {print $1t$2t$3, $0}' |LC_ALL=C sort -k1,1 --parallel=30 > ${j}.mat_cov.bed &
@@ -131,7 +133,7 @@ awk 'NR==1 { print $0 } NR>1 && $9 <= thresh { print $0 }'  thresh=$(awk 'END {p
 done
 
 
-##### see mouse_after_HMM_forGenome_browser.bsh for update! ####
+
 #make bed for http://epigenomegateway.wustl.edu/
 #FDR < = 0.1
 #Remain what it got from hmm (can ne M,P, or S), NOT from binomial test
