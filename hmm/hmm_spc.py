@@ -1,11 +1,51 @@
 import numpy as np
 from math import *
 import scipy.stats
-#from sys import argv
+from sys import argv
 import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
 import time
+import multiprocessing
+
+
+### input data for training
+# comnined all autosome
+# combined plus trand and minus strand
+
+f_int = counts_hmm.txt
+
+#data
+mat  = np.loadtxt(f_int, dtype=int ,delimiter='\t', usecols=[2], skiprows=1)
+total = np.loadtxt(f_int, dtype=int ,delimiter='\t', usecols=[4], skiprows=1)
+state = np.loadtxt(f_int, dtype=str ,delimiter='\t', usecols=[5], skiprows=1)
+n_state = np.full(len(state), int(3), dtype=int)
+n_state[state=="M"] = 0
+n_state[state=="S"] = 1
+n_state[state=="P"] = 2
+
+###structure of hmm
+
+##intial prob
+I_s=0.5
+I_m=0.25
+I_p=0.25
+
+##transition
+# 0,1,2 = M, S, P
+t = 1e-06
+t_mm, t_ms, t_mp = 1-t, t/2, t/2
+t_sm, t_ss, t_sp = t/2, 1-t, t/2
+t_pm, t_ps, t_pp = t/2, t/2, 1-t
+
+
+T = np.log(np.array( [[t_mm, t_ms, t_mp],[t_sm, t_ss, t_sp],[t_pm, t_ps, t_pp]]))
+
+## emmision
+p_m, p_s,p_p = 0.7, 0.5, 0.3
+##p_m, p_s,p_p = 0.8, 0.5, 0.2
+p = [p_m, p_s,p_p]
+
 
 # emmision
 binomlogpmf_dic={}
@@ -25,6 +65,7 @@ def get_max_argmax(l):
 
 binomtest_dic={}
 def binomtest(x, n, p):
+    x = min (x, n-x)
     if (x,n,p) not in binomtest_dic:
         binomtest_dic[(x,n,p)] = scipy.stats.binom_test(x, n, p)
     return binomtest_dic[(x,n,p)]
@@ -148,7 +189,7 @@ def em_interate(T, p, x=mat, n=total):
     return np.log(new_T), new_P, p_Y_f
 
 
-def em_interate_Tfixed(T, p, x=mat, n=total):
+def em_interate_T_mp_fixed(T, p, x=mat, n=total, update_state=1):
     t = time.time()
     f_p_m, p_Y_f = forward_probability_calculation(x, n, p, T)
     print "forward: ", t- time.time()
@@ -160,13 +201,26 @@ def em_interate_Tfixed(T, p, x=mat, n=total):
     for i in xrange(len(x)):
         p_Y_l[0,i] = sumLogProb(sumLogProb(b_p_m[0,i]+f_p_m[0,i], b_p_m[1,i]+f_p_m[1, i]),b_p_m[2, i]+f_p_m[2, i])
     print "p_Y_l ", t- time.time()
+    #A = [[None, None, None], [None, None, None], [None, None, None]]
+    A = np.zeros((3,3))
     new_P = [None, None, None] #P_m, P_s, P_p 
+    
+    # T of m and p fixed, but S to S,M,P update
+    for i in xrange(len(x)-1):
+        for l in range(3):
+            k=update_state
+            A[k,l] = A[k,l] + exp(f_p_m[k, i] + T[k,l] + get_emission_log_prob(x[i+1],n[i+1],p[l]) + b_p_m[l, i+1] - p_Y_l[0,i])
+    #A = np.array(A)
+    print "A : ", t- time.time()
     for k in range(3):
         new_P[k] = np.sum(np.exp(f_p_m[k,] + b_p_m[k,]-p_Y_l) * x ) / np.sum(np.exp(f_p_m[k,] + b_p_m[k,]-p_Y_l) * n ) 
+    new_T = np.exp(T)
+    k = update_state
+    new_T[k] = A[k]/A[k].sum()
     #new_p_Y_f = forward_probability_calculation(p= new_P, T=np.log(new_T))[1]
     print "secs: ", t- time.time()
-    print new_P, p_Y_f
-    return new_P, p_Y_f
+    print new_T, new_P, p_Y_f
+    return np.log(new_T), new_P, p_Y_f
 
 
 def make_em_plot(em_p_Y_f_list, t, file_name='em_p_Y_f_list_plot.pdf', i=0):
@@ -188,74 +242,56 @@ def hist(x, b=50, output_name = 'hist.pdf'):
     plt.close()
 
 
-###structure of hmm
-
-##intial prob
-I_s=0.5
-I_m=0.25
-I_p=0.25
-
-##transition
-# 0,1,2 = M, S, P
-t_mm, t_ms, t_mp = 0.8, 0.1, 0.1
-t_sm, t_ss, t_sp = 0.1, 0.8, 0.1
-t_pm, t_ps, t_pp = 0.1, 0.1, 0.8
-#t_mm, t_ms, t_mp = 0.45, 0.5, 0.05
-#t_sm, t_ss, t_sp = 0.05, 0.9, 0.05
-#t_pm, t_ps, t_pp = 0.05, 0.5, 0.45
-
-T = np.log(np.array( [[t_mm, t_ms, t_mp],[t_sm, t_ss, t_sp],[t_pm, t_ps, t_pp]]))
-
-## emmision
-p_m, p_s,p_p = 0.9, 0.5, 0.1
-#p_m, p_s,p_p = 0.8, 0.5, 0.2
-p = [p_m, p_s,p_p]
-
-
-### input data for training
-# comnined all autosome
-# combined plus trand and minus strand
-
-f_int = "counts_hmm.txt"
-#data
-mat  = np.loadtxt(f_int, dtype=int ,delimiter='\t', usecols=[2], skiprows=1)
-total = np.loadtxt(f_int, dtype=int ,delimiter='\t', usecols=[4], skiprows=1)
-state = np.loadtxt(f_int, dtype=str ,delimiter='\t', usecols=[5], skiprows=1)
-n_state = np.full(len(state), int(3), dtype=int)
-n_state[state=="M"] = 0
-n_state[state=="S"] = 1
-n_state[state=="P"] = 2
 
 ### run em
-#def em(T ,p , threshold = 0.01, max_iter=10):
-new_T, new_P, p_Y_f = em_interate(T, p, x=mat, n=total)
-p_Y_f_list = [p_Y_f]
-max_iter = 70
-for i in xrange(max_iter):
-    print i
-    new_T, new_P, p_Y_f = em_interate(new_T, new_P, x=mat, n=total)
-    p_Y_f_list.append(p_Y_f)
-#return new_T, new_P, p_Y_f_list
-make_em_plot(p_Y_f_list,"count_min=1", 'em_p_Y_f_list_plot_count_min=1.pdf')
-make_em_plot(p_Y_f_list, "count_min=1",'em_p_Y_f_list_plot_count_min=1_50.pdf' ,50)
+### run em with Tmp fixed, Ts update
 
-### run em with T fixed
-new_P, p_Y_f = em_interate_Tfixed(T, p, x=mat, n=total)
-p_Y_f_list = [p_Y_f]
-max_iter = 70
-for i in xrange(max_iter):
-    print i
-    new_P, p_Y_f = em_interate_Tfixed(T, new_P, x=mat, n=total)
-    p_Y_f_list.append(p_Y_f)
-#return new_T, new_P, p_Y_f_list
-make_em_plot(p_Y_f_list,"count_min=1 T fixed", 'em_p_Y_f_list_plot_count_min=1_Tfixed.pdf')
-make_em_plot(p_Y_f_list, "count_min=1 T fixed", 'em_p_Y_f_list_plot_count_min=1_Tfixed_50.pdf' ,50)
+def run_em_T_mp_fixed(t):
+    t_mm, t_ms, t_mp = 1-t, t/2, t/2
+    t_sm, t_ss, t_sp = t/2, 1-t, t/2
+    t_pm, t_ps, t_pp = t/2, t/2, 1-t
+    T = np.log(np.array( [[t_mm, t_ms, t_mp],[t_sm, t_ss, t_sp],[t_pm, t_ps, t_pp]]))
+    new_T, new_P, p_Y_f = em_interate_T_mp_fixed(T, p, x=mat, n=total)
+    p_Y_f_list = [p_Y_f]
+    new_T_list = [new_T]
+    new_P_list = [new_P]
+    max_iter = 70
+    for i in xrange(max_iter):
+        print i
+        new_T, new_P, p_Y_f = em_interate_T_mp_fixed(new_T, new_P, x=mat, n=total)
+        p_Y_f_list.append(p_Y_f)
+        new_T_list.append(new_T)
+        new_P_list.append(new_P)
+    make_em_plot(p_Y_f_list,"count_min=1 Tmx, Tpx fixed, t="+str(t)+", Tsx allow change for EM", "em_p_Y_f_list_plot_count_min=1_Tmpfixed_t="+str(t)+".pdf")
+    make_em_plot(p_Y_f_list, "count_min=1 Tmx, Tpx fixed, t="+str(t)+", Tsx allow change for EM", "em_p_Y_f_list_plot_count_min=1_Tmpfixed_t="+str(t)+"_50.pdf" ,50)
+    return [t, new_T_list,new_P_list, p_Y_f_list]
+
+t_list=[]
+for i in range(1,10):
+    t_list.append(10**(-i))
+
+pool = multiprocessing.Pool(processes=9)
+pool_output = pool.map(run_em_T_mp_fixed, t_list )
+# pool_output looks like [[t, new_T_list,new_P_list, p_Y_f_list],...]
+pool.close() # no more tasks
+pool.join()
+
+#for p in pool_output:
+for i in range(1,10):
+    t, new_T_list,new_P_list, _ = pool_output[i-1]
+    new_T = new_T_list[-1]
+    new_P = new_P_list[-1]
+    #print t
+    #print np.exp(new_T)
+    #print new_P
+    hmm_prediction("counts_plus_hmm.txt", "+", '1e-0'+str(i),new_T, new_P)
+    hmm_prediction("counts_minus_hmm.txt", "-",'1e-0'+str(i),new_T, new_P)
 
 
 ### input data for viterbi
 # seperate the autosome
 # seperate plus and minus strand
-def hmm_prediction(f_v, strand):
+def hmm_prediction(f_v, strand, t,new_T, new_P):
     #f_v = "counts_plus_hmm.txt"
     data_v = np.loadtxt(f_v, dtype=str ,delimiter='\t', usecols=range(0,6), skiprows=1)
     chrom_v = np.loadtxt(f_v, dtype=int ,delimiter='\t', usecols=[0], skiprows=1)
@@ -279,6 +315,7 @@ def hmm_prediction(f_v, strand):
         #v_path_Tfixed += (list(viterbi (x=x_c, n=t_c, p=new_P, T=T)))
     
     # output regions with neighbor sharing the same states as a bed file
+    state_map = {0:'M', 1:'S', 2:'P'}
     region_list=[]
     for c in xrange(1,20):
         snppos_c = snppos_v[chrom_v == c]
@@ -287,17 +324,17 @@ def hmm_prediction(f_v, strand):
         for l in xrange(1,len(v_path_c)):
             if v_path_c[l] != v_path_c[l-1]:
                 v = snppos_c[l-1]
-                region_list.append([str(c), str(u-1), str(v)])
+                region_list.append([str(c), str(u-1), str(v), state_map[v_path_c[l-1]]])
                 u = snppos_c[l]
-        region_list.append([str(c), str(u-1), str(snppos_c[-1])])
+        region_list.append([str(c), str(u-1), str(snppos_c[-1]), state_map[v_path_c[-1]]])
     
-    with open(f_v[0:-4]+'_regions.bed', 'w') as out:
+    with open(f_v[0:-4]+'_regions_t'+str(t)+'.bed', 'w') as out:
         for r in region_list:
-            out.write('\t'.join(r+["","",strand]))
+            out.write('\t'.join(r+['111',strand]))
             out.write('\n')
-        
-hmm_prediction("counts_plus_hmm.txt", "+")
-hmm_prediction("counts_minus_hmm.txt", "-")
+
+
+
 
 
 
