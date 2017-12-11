@@ -162,4 +162,6 @@ zcat toremove/LEP_ZYG_ATGCA_minus_hmm_regions_fdr0.1.bed.gz |awk 'BEGIN {OFS="\t
 
 zcat toremove/LEP_ZYG_ATGCA_minus_hmm_regions_fdr0.1.bed.gz | awk 'BEGIN {OFS="\t"; t=","; s="-";c="chr"} NR==1 { print $1,$2,$3,$4t$6t$7, 111, s} NR>1 {print chr$1,$2,$3,$4t$6t$7, 111, s }'
 
-##### see mouse_after_HMM_forGenome_browser.bsh for update! #### 
+##### see mouse_after_HMM_forGenome_browser.bsh for update! ####
+
+ 
