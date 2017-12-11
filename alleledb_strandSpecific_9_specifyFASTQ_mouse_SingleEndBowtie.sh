@@ -570,6 +570,8 @@ if [[ ${FLAG} -eq 9 || ${FLAG} -eq 0 ]] ; then
 	echo "### ALLELESEQ-BINOMIAL-RUN (Strand-Specific)###" >> 9-Strand-Specific-final-run.log
 	echo "###############################################" >> 9-Strand-Specific-final-run.log
 	date >> 9-Strand-Specific-final-run.log
+	ln -s ${PGENOME_PATH}/mat2ref.chain
+	ln -s ${PGENOME_PATH}/pat2ref.chain
 	make -f ${PIPELINEFILE} PREFIX=${FASTQ} >> 9-Strand-Specific-final-run.log
         #make -f ${PIPELINEFILE} BASE=${PGENOME_PATH} PL=${PL} SNPS=${PGENOME_PATH}/snp.calls CNVS=${PGENOME_PATH}/cnv_rd_${NAME}/rd.${NAME}.txt MAPS=${PGENOME_PATH}/%s_${NAME}.map FDR_CUTOFF=${FDR_THRESH} PREFIX=${FASTQ} >> 9-Strand-Specific-final-run.log
 	
