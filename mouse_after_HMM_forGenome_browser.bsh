@@ -1,3 +1,13 @@
+# use mouse_HMM.bsh to make necessary input files
+cd /workdir/sc2457/mouse_AlleleSpecific/allelicbias-PersonalGenome_P.CAST_M.B6-LEP_ZYG_ATGCA_forAlleleDB/Tm_Tp_fixed_2
+#then soft link necessary files to current dir
+#ln -s ../counts_hmm.txt .
+#ln -s ../counts_plus_hmm.txt .
+#ln -s ../counts_minus_hmm.txt .
+
+python hmm_spc.py counts_hmm.txt counts_plus_hmm.txt counts_minus_hmm.txt
+
+
 PL=/workdir/sc2457/alleleDB/alleledb_pipeline_mouse
 MAPS=/workdir/sc2457/mouse_AlleleSpecific/mouse_genome.sanger.ac.uk/REL-1505-SNPs_Indels/PersonalGenome_P.CAST_M.B6_indelsNsnps_CAST.bam/%s_P.CAST.EiJ_M.C57BL.6J.map
 PREFIX=LEP_ZYG_ATGCA_forAlleleDB

@@ -1,3 +1,4 @@
+#python hmm_spc.py counts_hmm.txt counts_plus_hmm.txt counts_minus_hmm.txt
 import numpy as np
 from math import *
 import scipy.stats
@@ -13,7 +14,10 @@ import multiprocessing
 # comnined all autosome
 # combined plus trand and minus strand
 
-f_int = counts_hmm.txt
+f_int = argv[1] #"counts_hmm.txt"
+counts_plus_hmm = argv[2] #"counts_plus_hmm.txt"
+counts_minus_hmm = argv[3] #"counts_minus_hmm.txt"
+
 
 #data
 mat  = np.loadtxt(f_int, dtype=int ,delimiter='\t', usecols=[2], skiprows=1)
@@ -33,7 +37,7 @@ I_p=0.25
 
 ##transition
 # 0,1,2 = M, S, P
-t = 1e-06
+t = 1e-05
 t_mm, t_ms, t_mp = 1-t, t/2, t/2
 t_sm, t_ss, t_sp = t/2, 1-t, t/2
 t_pm, t_ps, t_pp = t/2, t/2, 1-t
@@ -241,68 +245,26 @@ def hist(x, b=50, output_name = 'hist.pdf'):
     plt.savefig(output_name)
     plt.close()
 
-
-
-### run em
-### run em with Tmp fixed, Ts update
-
-def run_em_T_mp_fixed(t):
-    t_mm, t_ms, t_mp = 1-t, t/2, t/2
-    t_sm, t_ss, t_sp = t/2, 1-t, t/2
-    t_pm, t_ps, t_pp = t/2, t/2, 1-t
-    T = np.log(np.array( [[t_mm, t_ms, t_mp],[t_sm, t_ss, t_sp],[t_pm, t_ps, t_pp]]))
-    new_T, new_P, p_Y_f = em_interate_T_mp_fixed(T, p, x=mat, n=total)
-    p_Y_f_list = [p_Y_f]
-    new_T_list = [new_T]
-    new_P_list = [new_P]
-    max_iter = 70
-    for i in xrange(max_iter):
-        print i
-        new_T, new_P, p_Y_f = em_interate_T_mp_fixed(new_T, new_P, x=mat, n=total)
-        p_Y_f_list.append(p_Y_f)
-        new_T_list.append(new_T)
-        new_P_list.append(new_P)
-    make_em_plot(p_Y_f_list,"count_min=1 Tmx, Tpx fixed, t="+str(t)+", Tsx allow change for EM", "em_p_Y_f_list_plot_count_min=1_Tmpfixed_t="+str(t)+".pdf")
-    make_em_plot(p_Y_f_list, "count_min=1 Tmx, Tpx fixed, t="+str(t)+", Tsx allow change for EM", "em_p_Y_f_list_plot_count_min=1_Tmpfixed_t="+str(t)+"_50.pdf" ,50)
-    return [t, new_T_list,new_P_list, p_Y_f_list]
-
-t_list=[]
-for i in range(1,10):
-    t_list.append(10**(-i))
-
-pool = multiprocessing.Pool(processes=9)
-pool_output = pool.map(run_em_T_mp_fixed, t_list )
-# pool_output looks like [[t, new_T_list,new_P_list, p_Y_f_list],...]
-pool.close() # no more tasks
-pool.join()
-
-#for p in pool_output:
-for i in range(1,10):
-    t, new_T_list,new_P_list, _ = pool_output[i-1]
-    new_T = new_T_list[-1]
-    new_P = new_P_list[-1]
-    #print t
-    #print np.exp(new_T)
-    #print new_P
-    hmm_prediction("counts_plus_hmm.txt", "+", '1e-0'+str(i),new_T, new_P)
-    hmm_prediction("counts_minus_hmm.txt", "-",'1e-0'+str(i),new_T, new_P)
-
-
 ### input data for viterbi
 # seperate the autosome
 # seperate plus and minus strand
+f_data_dic={}
 def hmm_prediction(f_v, strand, t,new_T, new_P):
     #f_v = "counts_plus_hmm.txt"
-    data_v = np.loadtxt(f_v, dtype=str ,delimiter='\t', usecols=range(0,6), skiprows=1)
-    chrom_v = np.loadtxt(f_v, dtype=int ,delimiter='\t', usecols=[0], skiprows=1)
-    snppos_v = np.loadtxt(f_v, dtype=int ,delimiter='\t', usecols=[1], skiprows=1)
-    mat_v  = np.loadtxt(f_v, dtype=int ,delimiter='\t', usecols=[2], skiprows=1)
-    total_v = np.loadtxt(f_v, dtype=int ,delimiter='\t', usecols=[4], skiprows=1)
-    state_v = np.loadtxt(f_v, dtype=str ,delimiter='\t', usecols=[5], skiprows=1)
-    n_state_v = np.full(len(state_v), int(3), dtype=int)
-    n_state_v[state_v=="M"] = 0
-    n_state_v[state_v=="S"] = 1
-    n_state_v[state_v=="P"] = 2
+    if f_v in f_data_dic:
+        data_v, chrom_v, snppos_v, mat_v, total_v, state_v, n_state_v = f_data_dic[f_v]
+    else:
+        data_v = np.loadtxt(f_v, dtype=str ,delimiter='\t', usecols=range(0,6), skiprows=1)
+        chrom_v = np.loadtxt(f_v, dtype=int ,delimiter='\t', usecols=[0], skiprows=1)
+        snppos_v = np.loadtxt(f_v, dtype=int ,delimiter='\t', usecols=[1], skiprows=1)
+        mat_v  = np.loadtxt(f_v, dtype=int ,delimiter='\t', usecols=[2], skiprows=1)
+        total_v = np.loadtxt(f_v, dtype=int ,delimiter='\t', usecols=[4], skiprows=1)
+        state_v = np.loadtxt(f_v, dtype=str ,delimiter='\t', usecols=[5], skiprows=1)
+        n_state_v = np.full(len(state_v), int(3), dtype=int)
+        n_state_v[state_v=="M"] = 0
+        n_state_v[state_v=="S"] = 1
+        n_state_v[state_v=="P"] = 2
+        f_data_dic[f_v]=[data_v, chrom_v, snppos_v, mat_v, total_v, state_v, n_state_v]
     
     v_path=[]
     #v_path_Tfixed=[]
@@ -333,61 +295,108 @@ def hmm_prediction(f_v, strand, t,new_T, new_P):
             out.write('\t'.join(r+['111',strand]))
             out.write('\n')
 
+### run em
+### run em with Tmp fixed, Ts update
+
+def run_em_T_mp_fixed(t):
+    t_mm, t_ms, t_mp = 1-t, t/2, t/2
+    t_sm, t_ss, t_sp = t/2, 1-t, t/2
+    t_pm, t_ps, t_pp = t/2, t/2, 1-t
+    T = np.log(np.array( [[t_mm, t_ms, t_mp],[t_sm, t_ss, t_sp],[t_pm, t_ps, t_pp]]))
+    new_T, new_P, p_Y_f = em_interate_T_mp_fixed(T, p, x=mat, n=total)
+    p_Y_f_list = [p_Y_f]
+    new_T_list = [new_T]
+    new_P_list = [new_P]
+    max_iter = 70
+    for i in xrange(max_iter):
+        print i
+        new_T, new_P, p_Y_f = em_interate_T_mp_fixed(new_T, new_P, x=mat, n=total)
+        p_Y_f_list.append(p_Y_f)
+        new_T_list.append(new_T)
+        new_P_list.append(new_P)
+    make_em_plot(p_Y_f_list,"count_min=1 Tmx, Tpx fixed, t="+str(t)+", Tsx allow change for EM", "em_p_Y_f_list_plot_count_min=1_Tmpfixed_t="+str(t)+".pdf")
+    make_em_plot(p_Y_f_list, "count_min=1 Tmx, Tpx fixed, t="+str(t)+", Tsx allow change for EM", "em_p_Y_f_list_plot_count_min=1_Tmpfixed_t="+str(t)+"_50.pdf" ,50)
+    return [t, new_T_list,new_P_list, p_Y_f_list]
+
+
+def run():
+    t_list=[]
+    for i in range(1,10):
+        t_list.append(10**(-i))
+    
+    pool = multiprocessing.Pool(processes=9)
+    pool_output = pool.map(run_em_T_mp_fixed, t_list )
+    # pool_output looks like [[t, new_T_list,new_P_list, p_Y_f_list],...]
+    pool.close() # no more tasks
+    pool.join()
+    
+    #for p in pool_output:
+    for i in range(1,10):
+        t, new_T_list,new_P_list, _ = pool_output[i-1]
+        new_T = new_T_list[-1]
+        new_P = new_P_list[-1]
+        #print t
+        #print np.exp(new_T)
+        #print new_P
+        hmm_prediction(counts_plus_hmm, "+", '1e-0'+str(i),new_T, new_P)
+        hmm_prediction(counts_minus_hmm, "-",'1e-0'+str(i),new_T, new_P)
 
 
 
 
 
-# add a binomial test after hmm
-continue_count_list=[]
-x_sub_list=[]
-t_sub_list=[]
-p_value_list=[]
-v_path_binomtest=[]
-for i in xrange(1,20):
-    t_c = total_v[chrom_v == i]
-    x_c = mat_v[chrom_v == i]
-    v_path_c = np.array(v_path)[chrom_v == i]
-    x_sub, t_sub = x_c[0], t_c[0]
-    continue_count=1
-    x_sub_list.append(x_sub)
-    t_sub_list.append(t_sub)
-    continue_count_list.append(continue_count)
-    for l in xrange(1,len(v_path_c)):
-        if v_path_c[l] != v_path_c[l-1]:
-            p_value = binomtest(x_sub, t_sub, 0.5)
-            #for i in range(continue_count):
-            p_value_list += [p_value]*continue_count
-            if p_value <= 0.05:
-                 v_path_binomtest += [v_path_c[l-1]]*continue_count
-            else:
-                v_path_binomtest += [1]*continue_count
-            x_sub = x_c[l]
-            t_sub = t_c[l]
-            continue_count=1
-        else:
-            x_sub += x_c[l]
-            t_sub += t_c[l]
-            continue_count += 1
+
+
+
+
+def add_a_binomial_test_after_hmm_NOT_USED():
+    continue_count_list=[]
+    x_sub_list=[]
+    t_sub_list=[]
+    p_value_list=[]
+    v_path_binomtest=[]
+    for i in xrange(1,20):
+        t_c = total_v[chrom_v == i]
+        x_c = mat_v[chrom_v == i]
+        v_path_c = np.array(v_path)[chrom_v == i]
+        x_sub, t_sub = x_c[0], t_c[0]
+        continue_count=1
         x_sub_list.append(x_sub)
         t_sub_list.append(t_sub)
         continue_count_list.append(continue_count)
-    p_value = binomtest(x_sub, t_sub, 0.5)
-    p_value_list.append(p_value)
-    if p_value <= 0.05:
-        v_path_binomtest += [v_path_c[l-1]]*continue_count
-    else:
-        v_path_binomtest += [1]*continue_count
+        for l in xrange(1,len(v_path_c)):
+            if v_path_c[l] != v_path_c[l-1]:
+                p_value = binomtest(x_sub, t_sub, 0.5)
+                #for i in range(continue_count):
+                p_value_list += [p_value]*continue_count
+                if p_value <= 0.05:
+                     v_path_binomtest += [v_path_c[l-1]]*continue_count
+                else:
+                    v_path_binomtest += [1]*continue_count
+                x_sub = x_c[l]
+                t_sub = t_c[l]
+                continue_count=1
+            else:
+                x_sub += x_c[l]
+                t_sub += t_c[l]
+                continue_count += 1
+            x_sub_list.append(x_sub)
+            t_sub_list.append(t_sub)
+            continue_count_list.append(continue_count)
+        p_value = binomtest(x_sub, t_sub, 0.5)
+        p_value_list.append(p_value)
+        if p_value <= 0.05:
+            v_path_binomtest += [v_path_c[l-1]]*continue_count
+        else:
+            v_path_binomtest += [1]*continue_count
     
-
-
-state_map = {0:'M', 1:'S', 2:'P'}
-with open(f_v[0:-4]+'_out.txt', 'w') as out:
-    out.write("\t".join(['chrm','snppos','mat_allele_count','pat_allele_count','total_reads_count','state','hmm+BinomialTest', 'hmm_state', 'hmm_post_m', 'hmm_post_s','hmm_post_p']))
-    out.write("\n")
-    for i in xrange(len(v_path)):
-        out.write("\t".join(list(data_v[i])+[state_map[v_path_binomtest[i]]]+[state_map[v_path[i]]]))
+    state_map = {0:'M', 1:'S', 2:'P'}
+    with open(f_v[0:-4]+'_out.txt', 'w') as out:
+        out.write("\t".join(['chrm','snppos','mat_allele_count','pat_allele_count','total_reads_count','state','hmm+BinomialTest', 'hmm_state', 'hmm_post_m', 'hmm_post_s','hmm_post_p']))
         out.write("\n")
+        for i in xrange(len(v_path)):
+            out.write("\t".join(list(data_v[i])+[state_map[v_path_binomtest[i]]]+[state_map[v_path[i]]]))
+            out.write("\n")
 
 
 def viterbi_path_forward_snppos(v_path, start, end, file_head='viterbi_path_forward_snppos_'):
@@ -399,19 +408,19 @@ def viterbi_path_forward_snppos(v_path, start, end, file_head='viterbi_path_forw
     plt.savefig(file_head+str(start)+'-'+str(end)+'.pdf')
     plt.close()
 
-viterbi_path_forward_snppos(v_path_binomtest, 1000, 2000, 'v_path_binomtest_snppos_')
 
-plt.plot(snppos_v[1000:2000], v_path[0:1000], color='red')
-plt.plot(snppos_v[0:1000], n_state_v[0:1000], color='b')
-plt.scatter(snppos_v[0:1000], v_path[0:1000], s=10)
-plt.ylim(-0.5, 2.5)
-plt.xlabel('snppos')
-plt.savefig('viterbi_path_forward_snppos_0-1000.pdf')
-plt.close()
 
 
     
 def XXXX():
+    viterbi_path_forward_snppos(v_path_binomtest, 1000, 2000, 'v_path_binomtest_snppos_')
+    plt.plot(snppos_v[1000:2000], v_path[0:1000], color='red')
+    plt.plot(snppos_v[0:1000], n_state_v[0:1000], color='b')
+    plt.scatter(snppos_v[0:1000], v_path[0:1000], s=10)
+    plt.ylim(-0.5, 2.5)
+    plt.xlabel('snppos')
+    plt.savefig('viterbi_path_forward_snppos_0-1000.pdf')
+    plt.close()
 #q1_b
     f_p_m, p_Y_f = forward_probability_calculation(x=mat, n=total, p=p, T=T)
     b_p_m, p_Y_b = backward_probability_calculation(x=mat, n=total, p=p, T=T)
@@ -439,6 +448,6 @@ def XXXX():
 
 
 
-#if __name__ == '__main__':
-#    run()
+if __name__ == '__main__':
+    run()
     

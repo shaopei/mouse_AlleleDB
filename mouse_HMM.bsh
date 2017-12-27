@@ -42,15 +42,15 @@ awk 'BEGIN{OFS="\t"} ($18 <1.5 && $18 >0.5) {print $1,$2,$19, $20, $21,$14,$15,$
 awk 'BEGIN{OFS="\t"} ($8 <0.038) {print $1,$2,$3, $4, $5, $6}; ($8 >=0.038){print $1,$2,$3, $4, $5, "S"}' >> counts_minus_hmm.txt 
 
 
-# not used
-# $18 0.5 <= CNV <= 1.5
-# only chromosone 1
-for i in {1..1}; do echo $i; 
-	head counts_plus_noX_MinCount5_MaxPvalue1.txt -n 1 |awk 'BEGIN{OFS="\t"} {print $1,$2,$19, $20, $21, "state"}' > counts_plus_chrm$i.txt; 
-	cat counts_plus_noX_MinCount5_MaxPvalue1.txt |\
-	awk -v var=$i 'BEGIN{OFS="\t"} ($1 ==var && $18 <1.5 && $18 >0.5) {print $1,$2,$19, $20, $21,$14,$15,$16}' |\
-	awk 'BEGIN{OFS="\t"} ($8 <0.38) {print $1,$2,$3, $4, $5, $6}; ($8 >=0.38){print $1,$2,$3, $4, $5, "S"}' >> counts_plus_chrm$i.txt ;  
-	done
+#// # not used
+#// # $18 0.5 <= CNV <= 1.5
+#// # only chromosone 1
+#// for i in {1..1}; do echo $i; 
+#// 	head counts_plus_noX_MinCount5_MaxPvalue1.txt -n 1 |awk 'BEGIN{OFS="\t"} {print $1,$2,$19, $20, $21, "state"}' > counts_plus_chrm$i.txt; 
+#// 	cat counts_plus_noX_MinCount5_MaxPvalue1.txt |\
+#// 	awk -v var=$i 'BEGIN{OFS="\t"} ($1 ==var && $18 <1.5 && $18 >0.5) {print $1,$2,$19, $20, $21,$14,$15,$16}' |\
+#// 	awk 'BEGIN{OFS="\t"} ($8 <0.38) {print $1,$2,$3, $4, $5, $6}; ($8 >=0.38){print $1,$2,$3, $4, $5, "S"}' >> counts_plus_chrm$i.txt ;  
+#// 	done
 
 
 
