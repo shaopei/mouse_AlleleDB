@@ -36,7 +36,7 @@ legend("bottomright", pch=NA, lty = 1:9,col=rainbow_hcl(length(f_list)),
 dev.off()
 ###choose a distance, say 5kb, and plot the fraction close to a dREG site at each of the thresholds 
 pdf(args[4])
-plot(log10(t_list), fraction_at5K, xlab='log10(t)', ylab='fraction of M|P blocks at 5Kb')
+plot(log10(t_list), fraction_at5K, xlab='log10(t)', ylab='fraction of M|P blocks at 5Kb', type="b")
 #plot(log10(t_list), fraction_at10K, xlab='log10(t)', ylab='fraction of M|P blocks at 10Kb')
 dev.off()
 
