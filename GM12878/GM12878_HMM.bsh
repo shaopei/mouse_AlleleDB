@@ -1,0 +1,169 @@
+Min_count=1
+Max_Pvalus=1
+
+#locations of pipeline
+PL=/workdir/sc2457/tools/After_AlleleDB_pipeline
+
+# only anaysis autosome now
+grep -v X counts_plus.txt > counts_plus_noX.txt
+grep -v X counts_minus.txt > counts_minus_noX.txt
+
+
+
+# filter input files based on Min reads count and Max P-value
+R --vanilla --slave --args $(pwd) counts_plus_noX.txt ${Min_count} ${Max_Pvalus} < ${PL}/filter_counts_file.R 
+R --vanilla --slave --args $(pwd) counts_minus_noX.txt ${Min_count} ${Max_Pvalus} < ${PL}/filter_counts_file.R 
+
+Input_counts_plus=counts_plus_noX_MinCount${Min_count}_MaxPvalue${Max_Pvalus}.txt
+Input_counts_minus=counts_minus_noX_MinCount${Min_count}_MaxPvalue${Max_Pvalus}.txt
+
+# $18 0.5 <= CNV <= 1.5
+# use for hmm training
+head ${Input_counts_plus} -n 1 |awk 'BEGIN{OFS="\t"} {print $1,$2,$19, $20, $21, "state"}' > counts_hmm.txt 
+cat ${Input_counts_plus} | \
+awk 'BEGIN{OFS="\t"} ($18 <1.5 && $18 >0.5) {print $1,$2,$19, $20, $21,$14,$15,$16}' |\
+awk 'BEGIN{OFS="\t"} ($8 <0.038) {print $1,$2,$3, $4, $5, $6}; ($8 >=0.038){print $1,$2,$3, $4, $5, "S"}' >> counts_hmm.txt 
+
+cat ${Input_counts_minus} |\
+awk 'BEGIN{OFS="\t"} ($18 <1.5 && $18 >0.5) {print $1,$2,$19, $20, $21,$14,$15,$16}' |\
+awk 'BEGIN{OFS="\t"} ($8 <0.038) {print $1,$2,$3, $4, $5, $6}; ($8 >=0.038){print $1,$2,$3, $4, $5, "S"}' >> counts_hmm.txt 
+
+
+#use for hmm prediction
+#combine chromosone
+head ${Input_counts_plus} -n 1 |awk 'BEGIN{OFS="\t"} {print $1,$2,$19, $20, $21, "state"}' > counts_plus_hmm.txt 
+cat ${Input_counts_plus} |\
+awk 'BEGIN{OFS="\t"} ($18 <1.5 && $18 >0.5) {print $1,$2,$19, $20, $21,$14,$15,$16}' |\
+awk 'BEGIN{OFS="\t"} ($8 <0.038) {print $1,$2,$3, $4, $5, $6}; ($8 >=0.038){print $1,$2,$3, $4, $5, "S"}' >> counts_plus_hmm.txt 
+
+head ${Input_counts_minus} -n 1 |awk 'BEGIN{OFS="\t"} {print $1,$2,$19, $20, $21, "state"}' > counts_minus_hmm.txt 
+cat ${Input_counts_minus} |\
+awk 'BEGIN{OFS="\t"} ($18 <1.5 && $18 >0.5) {print $1,$2,$19, $20, $21,$14,$15,$16}' |\
+awk 'BEGIN{OFS="\t"} ($8 <0.038) {print $1,$2,$3, $4, $5, $6}; ($8 >=0.038){print $1,$2,$3, $4, $5, "S"}' >> counts_minus_hmm.txt 
+
+
+#// # not used
+#// # $18 0.5 <= CNV <= 1.5
+#// # only chromosone 1
+#// for i in {1..1}; do echo $i; 
+#// 	head counts_plus_noX_MinCount5_MaxPvalue1.txt -n 1 |awk 'BEGIN{OFS="\t"} {print $1,$2,$19, $20, $21, "state"}' > counts_plus_chrm$i.txt; 
+#// 	cat counts_plus_noX_MinCount5_MaxPvalue1.txt |\
+#// 	awk -v var=$i 'BEGIN{OFS="\t"} ($1 ==var && $18 <1.5 && $18 >0.5) {print $1,$2,$19, $20, $21,$14,$15,$16}' |\
+#// 	awk 'BEGIN{OFS="\t"} ($8 <0.38) {print $1,$2,$3, $4, $5, $6}; ($8 >=0.38){print $1,$2,$3, $4, $5, "S"}' >> counts_plus_chrm$i.txt ;  
+#// 	done
+
+
+
+##
+PL=/workdir/sc2457/alleleDB/alleledb_pipeline_mouse
+MAPS=/workdir/sc2457/mouse_AlleleSpecific/mouse_genome.sanger.ac.uk/REL-1505-SNPs_Indels/PersonalGenome_P.CAST_M.B6_indelsNsnps_CAST.bam/%s_P.CAST.EiJ_M.C57BL.6J.map
+PREFIX=LEP_ZYG_ATGCA_forAlleleDB
+MATBOWTIE=${PREFIX}.mat.bowtie
+PATBOWTIE=${PREFIX}.pat.bowtie
+FDR_SIMS=10
+FDR_CUTOFF=0.1
+
+# remove AMB reads and sort by index
+python ${PL}/filter_reads_out.py ${PATBOWTIE} - originalmatpatreads.toremove.ids | LC_ALL=C  sort -k1 -n  --parallel=30 -o ${PATBOWTIE}_AMBremoved_sorted
+python ${PL}/filter_reads_out.py ${MATBOWTIE} - originalmatpatreads.toremove.ids | LC_ALL=C  sort -k1 -n  --parallel=30 -o ${MATBOWTIE}_AMBremoved_sorted
+
+# seperate mat and pat reads from bowtie output
+# order matters! ${PATBOWTIE}_AMBremoved_sorted need to be in front of ${MATBOWTIE}_AMBremoved_sorted !!!
+python ${PL}/seperate_mat_pat_reads_withSNPs.py ${PATBOWTIE}_AMBremoved_sorted ${MATBOWTIE}_AMBremoved_sorted ${MAPS}
+# output is ${PATBOWTIE}_AMBremoved_sorted_specific.bowtie ${PATBOWTIE}_AMBremoved_sorted_identical.bowtie ${MATBOWTIE}_AMBremoved_sorted_specific.bowtie ${MAPS}
+
+#bowtie to bed
+  INPUT (bowtie output) 
+  col1: read_name              
+  col2: strand
+  col3: chr
+  col4: position (0-based)
+  col5: Read sequence (reverse-complemented if orientation is -).
+  col6: ASCII-encoded read qualities (reversed if orientation is -)
+  col7: 
+  col8: info
+  
+  Convert bowtie to bed file with the 4th col the ID and sequence of the read separated by "#*o*#"
+  position here is  0based
+  OUTPUT is UNsorted:
+  col1: chr
+  col2: chromStart(0based) 
+  col3: chrEnd(1based)	half open, chromStart=0, chromEnd=100, and span the bases numbered 0-99
+  col4: ID#*o*#sequence#*o*#strand#*o*#score
+  col5: 111
+  col6: strand
+
+#//for f in *_AMBremoved_sorted_specific.bowtie; 
+#//	do cat $f | awk 'BEGIN {FS= "\t"; OFS="\t"; t="#*o*#"; H=111 } {print $3, $4, $4+length($5), $1t$5t$2t$6, $H, $2}' > $f.bed
+#//done
+cat ${MATBOWTIE}_AMBremoved_sorted_specific.bowtie | awk 'BEGIN {FS= "\t"; OFS="\t"; t="#*o*#"} {print $3, $4, $4+length($5), $1t$5t$2t$6, 111, $2}' > ${MATBOWTIE}_AMBremoved_sorted_specific.bed &
+cat ${PATBOWTIE}_AMBremoved_sorted_specific.bowtie | awk 'BEGIN {FS= "\t"; OFS="\t"; t="#*o*#"} {print $3, $4, $4+length($5), $1t$5t$2t$6, 111, $2}' > ${PATBOWTIE}_AMBremoved_sorted_specific.bed &
+cat ${PATBOWTIE}_AMBremoved_sorted_identical.bowtie| awk 'BEGIN {FS= "\t"; OFS="\t"; t="#*o*#"} {print $3, $4, $4+length($5), $1t$5t$2t$6, 111, $2}' > ${PATBOWTIE}_AMBremoved_sorted_identical.bed &
+wait
+
+# liftOver to reference genome
+# usage: liftOver oldFile map.chain newFile unMapped
+liftOver ${MATBOWTIE}_AMBremoved_sorted_specific.bed mat2ref.chain  ${MATBOWTIE}_AMBremoved_sorted_specific.map2ref.bed ${MATBOWTIE}_AMBremoved_sorted_specific.unmap2ref.log
+liftOver ${PATBOWTIE}_AMBremoved_sorted_specific.bed pat2ref.chain  ${PATBOWTIE}_AMBremoved_sorted_specific.map2ref.bed ${PATBOWTIE}_AMBremoved_sorted_specific.unmap2ref.log
+liftOver ${PATBOWTIE}_AMBremoved_sorted_identical.bed pat2ref.chain  ${PATBOWTIE}_AMBremoved_sorted_identical.map2ref.bed ${PATBOWTIE}_AMBremoved_sorted_identical.unmap2ref.log
+
+for f in *.map2ref.bed;
+do j=`echo $f|rev| cut -d \. -f 2-|rev`
+LC_ALL=C sort -k1,1 -k2,2n --parallel=30 $f > ${j}.sorted.bed 
+done
+
+#
+
+
+##### see mouse_after_HMM_forGenome_browser.bsh for update! ####
+for f in counts_*_hmm_regions.bed;
+	do j=`echo $f| cut -d \. -f 1`
+bedtools coverage -a $f -b ${MATBOWTIE}_AMBremoved_sorted_specific.map2ref.sorted.bed -s | awk 'BEGIN {OFS="\t"; t="_"} {print $1t$2t$3, $0}' |LC_ALL=C sort -k1,1 --parallel=30 > ${j}.mat_cov.bed &
+bedtools coverage -a $f -b ${PATBOWTIE}_AMBremoved_sorted_specific.map2ref.sorted.bed -s | awk 'BEGIN {OFS="\t"; t="_"} {print $1t$2t$3, $0}' |LC_ALL=C sort -k1,1 --parallel=30 > ${j}.pat_cov.bed &
+wait
+join -t $'\t' -j 1 -o 1.1,1.2,1.3,1.4,1.5,1.8,2.8 ${j}.mat_cov.bed ${j}.pat_cov.bed > ${j}.temp_cov.bed &
+bedtools coverage -a $f -b ${PATBOWTIE}_AMBremoved_sorted_identical.map2ref.sorted.bed -s | awk 'BEGIN {OFS="\t"; t="_"} {print $1t$2t$3, $0}' |LC_ALL=C sort -k1,1 --parallel=30 > ${j}.iden_cov.bed &
+wait
+join -t $'\t' -j 1 -o 1.2,1.3,1.4,1.5,1.6,1.7,2.8 ${j}.temp_cov.bed ${j}.iden_cov.bed | LC_ALL=C sort -k1,1n -k2,2n --parallel=30 > ${j}.merged_cov.bed
+rm ${j}.temp_cov.bed ${j}.mat_cov.bed ${j}.pat_cov.bed ${j}.iden_cov.bed
+python ${PL}/BinomialTestFor_merged_cov.bed.py ${j}.merged_cov.bed ${j}.merged_cov_binomtest.bed
+python ${PL}/FalsePosFor_merged_cov.bed.py ${j}.merged_cov_binomtest.bed ${FDR_SIMS} ${FDR_CUTOFF} > ${j}.merged_cov_binomtest_FDR.txt
+
+awk 'NR==1 { print $0 } NR>1 && $9 <= thresh { print $0 }'  thresh=$(awk 'END {print $6}' ${j}.merged_cov_binomtest_FDR.txt) < ${j}.merged_cov_binomtest.bed > ${j}_interestingHets.bed
+done
+
+
+
+#make bed for http://epigenomegateway.wustl.edu/
+#FDR < = 0.1
+#Remain what it got from hmm (can ne M,P, or S), NOT from binomial test
+
+cat allelicbias-PersonalGenome_P.CAST_M.B6-LEP_ZYG_ATGCA_forAlleleDB/counts_minus_hmm_regions_interestingHets.bed | awk 'BEGIN {OFS="\t"; t=","; s="-";c="chr"} NR==1 { print $1,$2,$3,$4t$6t$7, 111, s} NR>1 {print c$1,$2,$3,$4t$6t$7, 111, s }' > LEP_ZYG_ATGCA_minus_hmm_regions_fdr0.1.bed
+bgzip LEP_ZYG_ATGCA_minus_hmm_regions_fdr0.1.bed -f
+tabix -p bed LEP_ZYG_ATGCA_minus_hmm_regions_fdr0.1.bed.gz -f 
+
+cat allelicbias-PersonalGenome_P.CAST_M.B6-LEP_ZYG_ATGCA_forAlleleDB/counts_plus_hmm_regions_interestingHets.bed | awk 'BEGIN {OFS="\t"; t=","; s="+";c="chr"} NR==1 { print $1,$2,$3,$4t$6t$7, 111, s} NR>1 {print c$1,$2,$3,$4t$6t$7, 111, s }' > LEP_ZYG_ATGCA_plus_hmm_regions_fdr0.1.bed
+bgzip LEP_ZYG_ATGCA_plus_hmm_regions_fdr0.1.bed
+tabix -p bed LEP_ZYG_ATGCA_plus_hmm_regions_fdr0.1.bed.gz
+
+zcat LEP_ZYG_ATGCA_minus_hmm_regions_fdr0.1.bed.gz | awk 'BEGIN {OFS="\t"; t=","; s="-";c="chr"} NR==1 { print $1,$2,$3,$4t$6t$7, 111, s} NR>1 {print chr$1,$2,$3,$4t$6t$7, 111, s }' > test.bed
+bgzip test.bed
+tabix -p bed test.bed.gz
+
+zcat LEP_ZYG_ATGCA_plus_hmm_regions_fdr0.1.bed.gz | awk 'BEGIN {OFS="\t"; t=","; s="+";c="chr"} NR==1 { print $1,$2,$3,$4t$6t$7, 111, s} NR>1 {print chr$1,$2,$3,$4t$6t$7, 111, s }' > test2.bed
+bgzip test2.bed
+tabix -p bed test2.bed.gz
+
+zcat LEP_ZYG_ATGCA_plus_hmm_regions_fdr0.1.bed.gz | awk 'BEGIN {OFS="\t"; t=","; s="+";c="chr"; e="."} NR==1 { print $1,$2,$3,$4t$6t$7, 111, e} NR>1 {print chr$1,$2,$3,$4t$6t$7, 111, e }' > test3.bed
+bgzip test3.bed
+tabix -p bed test3.bed.gz
+
+
+zcat toremove/LEP_ZYG_ATGCA_minus_hmm_regions_fdr0.1.bed.gz |awk 'BEGIN {OFS="\t"} {print $1,$2,$3,$9 }'
+zcat toremove/LEP_ZYG_ATGCA_minus_hmm_regions_fdr0.1.bed.gz |awk 'BEGIN {OFS="\t"} {print $1,$2,$3, 1 }'
+
+zcat toremove/LEP_ZYG_ATGCA_minus_hmm_regions_fdr0.1.bed.gz | awk 'BEGIN {OFS="\t"; t=","; s="-";c="chr"} NR==1 { print $1,$2,$3,$4t$6t$7, 111, s} NR>1 {print chr$1,$2,$3,$4t$6t$7, 111, s }'
+
+##### see mouse_after_HMM_forGenome_browser.bsh for update! ####
+
+ 
