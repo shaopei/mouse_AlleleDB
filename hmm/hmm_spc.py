@@ -1,4 +1,4 @@
-#python hmm_spc.py counts_hmm.txt counts_plus_hmm.txt counts_minus_hmm.txt
+#python hmm_spc.py counts_hmm.txt counts_plus_hmm.txt counts_minus_hmm.txt chromosome_num
 import numpy as np
 from math import *
 import scipy.stats
@@ -17,7 +17,7 @@ import multiprocessing
 f_int = argv[1] #"counts_hmm.txt"
 counts_plus_hmm = argv[2] #"counts_plus_hmm.txt"
 counts_minus_hmm = argv[3] #"counts_minus_hmm.txt"
-
+chromosome_num=int(argv[4])
 
 #data
 mat  = np.loadtxt(f_int, dtype=int ,delimiter='\t', usecols=[2], skiprows=1)
@@ -269,7 +269,7 @@ def hmm_prediction(f_v, strand, t,new_T, new_P):
     v_path=[]
     #v_path_Tfixed=[]
     
-    for i in xrange(1,20):
+    for i in xrange(1,chromosome_num+1):
         t_c = total_v[chrom_v == i]
         x_c = mat_v[chrom_v == i]
         #snp_c = snppos[chrom == i]
@@ -279,7 +279,7 @@ def hmm_prediction(f_v, strand, t,new_T, new_P):
     # output regions with neighbor sharing the same states as a bed file
     state_map = {0:'M', 1:'S', 2:'P'}
     region_list=[]
-    for c in xrange(1,20):
+    for c in xrange(1,chromosome_num+1):
         snppos_c = snppos_v[chrom_v == c]
         v_path_c = np.array(v_path)[chrom_v == c]
         u = snppos_c[0]
