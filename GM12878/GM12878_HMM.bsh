@@ -143,23 +143,23 @@ if [ ${strand} == "minus" ]
 then cat counts_minus_${j}.bed | awk 'BEGIN {OFS="\t"; t=","; s="-";c="chr"} NR==1 { print $1,$2,$3,$4t$6t$7, 111, s} 
 NR>1 && $4!="S" {print c$1,$3-1,$3,$4t$6t$7, 111, s}' > counts_minus_${j}_5head.bed
 bedtools closest -D a -a <(cat counts_minus_${j}_5head.bed | awk 'BEGIN {OFS="\t"} NR!=1 {print $0}' | LC_ALL=C sort -k1,1 -k2,2n --parallel=30) -b tss_paired_gm12878_minus.bed \
-|awk '($11<0){print $11*(-1)}; ($11>=0) {print $11}' > counts_${j}_5head_distance_toclosest-dReg_Counts.tmp
+|awk '($NF<0){print $NF*(-1)}; ($NF>=0) {print $NF}' > counts_${j}_5head_distance_toclosest-dReg_Counts.tmp
 
 else
 cat counts_plus_${j}.bed | awk 'BEGIN {OFS="\t"; t=","; s="+";c="chr"} NR==1 { print $1,$2,$3,$4t$6t$7, 111, s} 
 NR>1 && $4!="S"  {print c$1,$2,$2+1,$4t$6t$7, 111, s}' > counts_plus_${j}_5head.bed
 bedtools closest -D a -a <(cat counts_plus_${j}_5head.bed | awk 'BEGIN {OFS="\t"} NR!=1 {print $0}' | LC_ALL=C sort -k1,1 -k2,2n --parallel=30) -b tss_paired_gm12878_plus.bed \
-|awk '($11<0){print $11*(-1)}; ($11>=0) {print $11}' >>  counts_${j}_5head_distance_toclosest-dReg_Counts.tmp
+|awk '($NF<0){print $NF*(-1)}; ($NF>=0) {print $NF}' >>  counts_${j}_5head_distance_toclosest-dReg_Counts.tmp
 fi
 cat counts_${j}_5head_distance_toclosest-dReg_Counts.tmp | LC_ALL=C sort --temporary-directory=/workdir/sc2457/tmp/ --parallel=10 -n | uniq -c > counts_${j}_5head_distance_toclosest-dReg_Counts.txt
-rm counts_${j}_5head_distance_toclosest-dReg_Counts.tmp
+#rm counts_${j}_5head_distance_toclosest-dReg_Counts.tmp
 
 # distance to the closet upstream dReg sites.
 # -D a Report distance with respect to A.
 # -id Ignore features in B that are downstream of features in A. 
 # check both end, no id
 #bedtools closest -D a -a <(cat counts_${j}_5head.bed | awk 'BEGIN {OFS="\t"} NR!=1 {print $0}' | LC_ALL=C sort -k1,1 -k2,2n --parallel=30) -b LEP_ZYG_ATGCA.dREG.peak.score.bed.gz \
-#|awk '($11<0){print $11*(-1)}; ($11>=0) {print $11}' | LC_ALL=C sort --temporary-directory=/workdir/sc2457/tmp/ --parallel=10 -n | uniq -c >  counts_${j}_5head_distance_toclosest-dReg_Counts.txt
+#|awk '($13<0){print $13*(-1)}; ($13>=0) {print $13}' | LC_ALL=C sort --temporary-directory=/workdir/sc2457/tmp/ --parallel=10 -n | uniq -c >  counts_${j}_5head_distance_toclosest-dReg_Counts.txt
 
 python sum_of_counts.py counts_${j}_5head_distance_toclosest-dReg_Counts.txt `awk 'END {print $2}' counts_${j}_5head_distance_toclosest-dReg_Counts.txt` > counts_${j}_5head_distance_toclosest-dReg_AccumulateCounts.txt 
 
@@ -168,7 +168,41 @@ done
 
 ### make figures
 R --vanilla --slave --args $(pwd) "counts_hmm_regions_t*_interestingHets_5head_distance_toclosest-dReg_AccumulateCounts.txt" counts_hmm_regions_tX_interestingHets_5head_distance_toclosest-dReg_AccumulateCounts.pdf counts_hmm_regions_tX_interestingHets_5head_distance_toclosest-dReg_At5Kb.pdf < getFractionOfBlock_DistanceToNearestSites.R
+# pick t1e-06 for GM12878
 
 ####END of analysis ######
+
+#### find concordant and discordant regions
+# keep fdr <= 0.1 and state is P or M, 
+# this can also used for IGV viewing
+T=5
+cat counts_minus_hmm_regions_t1e-0${T}_interestingHets.bed | awk 'BEGIN {OFS="\t"; t=","; s="-";c="chr"} NR==1 { print $1,$2,$3,$4t$6t$7, 111, s} 
+NR>1 && $4!="S"  {print c$1,$2,$3,$4t$6t$7, 111, s}' > counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed
+
+cat counts_plus_hmm_regions_t1e-0${T}_interestingHets.bed | awk 'BEGIN {OFS="\t"; t=","; s="+";c="chr"} NR==1 { print $1,$2,$3,$4t$6t$7, 111, s} 
+NR>1 && $4!="S"  {print c$1,$2,$3,$4t$6t$7, 111, s}' > counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed
+
+# identify regions intersect with tss +- 150bp
+## sort Tss regions, only need to do once
+#cat tss_paired_gm12878_plus.bed |LC_ALL=C sort --temporary-directory=/workdir/sc2457/tmp/ --parallel=10 -V > tss_paired_gm12878_plus_Vsorted.bed
+#cat tss_paired_gm12878_minus.bed |LC_ALL=C sort --temporary-directory=/workdir/sc2457/tmp/ --parallel=10 -V > tss_paired_gm12878_minus_Vsorted.bed
+
+paste <(bedtools closest -iu -D a -a tss_paired_gm12878_plus_Vsorted.bed -b counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed) <(bedtools closest -iu -D a -a tss_paired_gm12878_minus_Vsorted.bed -b counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed) \
+|awk '($13 != -1 && $NF !=-1 && $13<=150 && $NF<=150) {print substr($10,1,1), substr($23,1,1)}' | awk '($1 == $2){print $0} '
+# Concordant (85 when T=6) 
+paste <(bedtools closest -iu -D a -a tss_paired_gm12878_plus_Vsorted.bed -b counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed) <(bedtools closest -iu -D a -a tss_paired_gm12878_minus_Vsorted.bed -b counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed) |awk '($13 != -1 && $NF !=-1 && $13<=150 && $NF<=150) {print $0}' | awk '(substr($10,1,1) == substr($23,1,1)){print $0} ' | wc -l
+# Discordant  (22 when T=6)
+paste <(bedtools closest -iu -D a -a tss_paired_gm12878_plus_Vsorted.bed -b counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed) <(bedtools closest -iu -D a -a tss_paired_gm12878_minus_Vsorted.bed -b counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed) |awk '($13 != -1 && $NF !=-1 && $13<=150 && $NF<=150) {print $0}' | awk '(substr($10,1,1) != substr($23,1,1)){print $0} '|wc -l
+
+
+
+
+bedtools closest -D a -a <(cat counts_plus_${j}_5head.bed | awk 'BEGIN {OFS="\t"} NR!=1 {print $0}' | LC_ALL=C sort -k1,1 -k2,2n --parallel=30) -b tss_paired_gm12878_plus.bed \
+|awk '($13<0){print $13*(-1)}; ($13>=0) {print $13}' >>  counts_${j}_5head_distance_toclosest-dReg_Counts.tmp
+
+
+
+
+
 
  
