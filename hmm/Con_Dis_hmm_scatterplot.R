@@ -33,7 +33,9 @@ Strand_count$log2_minus_over_plus = log2(Strand_count$log_mat_over_pat_minus / S
 # Concordant regions are filtered by log2_minus_over_plus
 d = sum(Strand_count$Con_Dis=='Discordant')
 c = sum(Strand_count$Con_Dis=='Concordant')
-f = sum((Strand_count$log2_minus_over_plus[Strand_count$Con_Dis == 'Concordant'] < -1.5) | (Strand_count$log2_minus_over_plus[Strand_count$Con_Dis == 'Concordant'] > 1.5))
+f = sum((Strand_count$log2_minus_over_plus[Strand_count$Con_Dis == 'Concordant'] < -1.5) | 
+          (Strand_count$log2_minus_over_plus[Strand_count$Con_Dis == 'Concordant'] > 1.5), 
+        na.rm = T)
 cat('# of Concordant region before filter = ', c,'\n')
 cat('# of Concordant region after filter = ', c-f,'\n')
 cat('# of Discordant region = ', d,'\n')
