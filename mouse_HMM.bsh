@@ -107,10 +107,15 @@ liftOver ${MATBOWTIE}_AMBremoved_sorted_specific.bed mat2ref.chain  ${MATBOWTIE}
 liftOver ${PATBOWTIE}_AMBremoved_sorted_specific.bed pat2ref.chain  ${PATBOWTIE}_AMBremoved_sorted_specific.map2ref.bed ${PATBOWTIE}_AMBremoved_sorted_specific.unmap2ref.log
 liftOver ${PATBOWTIE}_AMBremoved_sorted_identical.bed pat2ref.chain  ${PATBOWTIE}_AMBremoved_sorted_identical.map2ref.bed ${PATBOWTIE}_AMBremoved_sorted_identical.unmap2ref.log
 
-for f in *.map2ref.bed;
-do j=`echo $f|rev| cut -d \. -f 2-|rev`
-#cat $f |awk '{c="chr"}{print c$0}'
-LC_ALL=C sort -k1,1V -k2,2n --parallel=30 $f > ${j}.sorted.bed 
+LC_ALL=C sort -k1,1V -k2,2n --parallel=30 ${PATBOWTIE}_AMBremoved_sorted_identical.map2ref.bed > ${PATBOWTIE}_AMBremoved_sorted_identical.map2ref.sorted.bed
+
+# remove reads that DONOT overlape with a SNP in ${PATBOWTIE}_AMBremoved_sorted_specific.map2ref.sorted.bed and  ${MATBOWTIE}_AMBremoved_sorted_specific.map2ref.sorted.bed 
+for f in *_AMBremoved_sorted_specific.map2ref.bed;
+do echo $f
+j=`echo $f|rev| cut -d \. -f 2-|rev`
+intersectBed -sorted -u -a <(LC_ALL=C sort -k1,1V -k2,2n --parallel=30 $f) \
+-b <(cat /workdir/sc2457/mouse_AlleleSpecific/mouse_genome.sanger.ac.uk/REL-1505-SNPs_Indels/PersonalGenome_P.CAST_M.B6_indelsNsnps_CAST.bam/P.CAST_M.B6_indelsNsnps_CAST.bam.snp.unfiltered \
+|awk '{OFS="\t"}{print $1, $2-1, $2, $6 }') > ${j}.sorted.bed 
 done
 
 #
