@@ -1,0 +1,18 @@
+cd /workdir/sc2457/GM_GroSeq_AlleleDB_20170606/ENCODE_20170609
+grep H3K27me3 metadata_fastq.tsv |cut -f 1
+// ENCFF001EXM
+// ENCFF001EXO
+// ENCFF000ASV
+// ENCFF000ASW
+// ENCFF000ASZ
+// [sc2457@cbsudanko H3K27me3]$ ln -s ../ENCODE_cnt/ENCFF001EXM.cnt.gz .
+// [sc2457@cbsudanko H3K27me3]$ ln -s ../ENCODE_cnt/ENCFF001EXO.cnt.gz .
+// [sc2457@cbsudanko H3K27me3]$ ln -s ../ENCODE_cnt/ENCFF000ASV.cnt.gz .
+// [sc2457@cbsudanko H3K27me3]$ ln -s ../ENCODE_cnt/ENCFF000ASW.cnt.gz .
+// [sc2457@cbsudanko H3K27me3]$ ln -s ../ENCODE_cnt/ENCFF000ASZ.cnt.gz .
+
+for f in *.cnt.gz; do zcat $f >  ${f:0:11}.cnt ; done
+
+for f in *.cnt
+	do make -f PIPELINE_startWith_cnt.mk PREFIX=${f:0:11}
+done
