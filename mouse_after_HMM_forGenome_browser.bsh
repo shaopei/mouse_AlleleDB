@@ -109,16 +109,22 @@ NR>1 && $4=="M"  {print c$1,$2,$3,$4t$6t$7, 111, s}' > counts_plus_hmm_regions_t
 
 #### find concordant and discordant regions
 # keep fdr <= 0.1 and state is P or M, 
+# check if the HMM and the Actual count agree on the winning parents. Filter out those do NOT agree, ex: M,44,63 HMM call M, but have more pat reads than mat reads
 # this can also used for IGV viewing
-T=5
-cat counts_minus_hmm_regions_t1e-0${T}_interestingHets.bed | awk 'BEGIN {OFS="\t"; t=","; s="-";c="chr"} NR==1 { print $1,$2,$3,$4t$6t$7, 111, s} 
-NR>1 && $4!="S"  {print c$1,$2,$3,$4t$6t$7, 111, s}' > counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed
-cat counts_plus_hmm_regions_t1e-0${T}_interestingHets.bed | awk 'BEGIN {OFS="\t"; t=","; s="+";c="chr"} NR==1 { print $1,$2,$3,$4t$6t$7, 111, s} 
-NR>1 && $4!="S"  {print c$1,$2,$3,$4t$6t$7, 111, s}' > counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed
+# for T in {1..5}; do
 
-####Correlations between the ratio of maternal and paternal alleles within HMM regions between plus and minus strands
-cat counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed | awk 'NR>1 {print $1 substr($4,1,1)}'|sort|uniq -c
-cat counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed | awk 'NR>1 {print $1 substr($4,1,1)}'|sort|uniq -c
+cat counts_minus_hmm_regions_t1e-0${T}_interestingHets.bed | awk 'BEGIN {OFS="\t"; t=","; s="-";c="chr"} NR==1 { print $1,$2,$3,$4t$6t$7, 111, s} 
+#NR>1 && $4=="P" && $7>$6 {print c$1,$2,$3,$4t$6t$7, 999, s}
+#NR>1 && $4=="M" && $6>$7 {print c$1,$2,$3,$4t$6t$7, 111, s}
+NR>1 && $4!="S" {print c$1,$2,$3,$4t$6t$7, 111, s}' > counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed
+cat counts_plus_hmm_regions_t1e-0${T}_interestingHets.bed | awk 'BEGIN {OFS="\t"; t=","; s="+";c="chr"} NR==1 { print $1,$2,$3,$4t$6t$7, 111, s} 
+#NR>1 && $4=="P" && $7>$6 {print c$1,$2,$3,$4t$6t$7, 999, s}
+#NR>1 && $4=="M" && $6>$7 {print c$1,$2,$3,$4t$6t$7, 111, s}
+NR>1 && $4!="S" {print c$1,$2,$3,$4t$6t$7, 111, s}' > counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed
+
+####Correlations between the ratio of maternal and paternal alleles within HMM regions between plus and minus strands???
+#cat counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed | awk 'NR>1 {print $1 substr($4,1,1)}'|sort|uniq -c
+#cat counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed | awk 'NR>1 {print $1 substr($4,1,1)}'|sort|uniq -c
 
 ##### identify Concordant and Discordant regions
 # identify hmm regions within 150bp(d) downstream TSS
@@ -130,57 +136,47 @@ cat counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed | awk 'NR>1 {print
 dREG_peak_score=out.dREG.peak.full.bed.gz
 dREG_peak_score_plus=tss_paired_LEP_ZYG_ATGCA_dREG_plus.bed
 dREG_peak_score_minus=tss_paired_LEP_ZYG_ATGCA_dREG_minus.bed
-zcat ${dREG_peak_score} | awk 'BEGIN{OFS="\t"} {print $1, $7, $3, $4,$5, "+"}' |LC_ALL=C sort --temporary-directory=/workdir/sc2457/tmp/ --parallel=10 -V > ${dREG_peak_score_plus}
-zcat ${dREG_peak_score} | awk 'BEGIN{OFS="\t"} {print $1, $2, $7, $4,$5, "-"}' |LC_ALL=C sort --temporary-directory=/workdir/sc2457/tmp/ --parallel=10 -V > ${dREG_peak_score_minus}
+#zcat ${dREG_peak_score} | awk 'BEGIN{OFS="\t"} {print $1, $7, $3, $4,$5, "+"}' |LC_ALL=C sort --temporary-directory=/workdir/sc2457/tmp/ --parallel=10 -V > ${dREG_peak_score_plus}
+#zcat ${dREG_peak_score} | awk 'BEGIN{OFS="\t"} {print $1, $2, $7, $4,$5, "-"}' |LC_ALL=C sort --temporary-directory=/workdir/sc2457/tmp/ --parallel=10 -V > ${dREG_peak_score_minus}
 
 # Concordant
+d=150
 join -t $'\t' -j 1 -o 1.2,1.3,1.4,1.11,1.14,2.2,2.3,2.4,2.11,2.14 <(bedtools closest -iu -D a -a ${dREG_peak_score_plus} -b counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed| awk 'BEGIN {OFS="\t";t="_"}{print $1t$2, $0}') <(bedtools closest -iu -D a -a ${dREG_peak_score_minus} -b counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed|awk 'BEGIN {OFS="\t";t="_"}{print $1t$3, $0}')\
-|awk '($5 != -1 && $10 !=-1 && $5<=1500 && $10<=1500) {print $0}' | awk '(substr($4,1,1) == substr($9,1,1)){print $0} ' | wc -l
-join -t $'\t' -j 1 -o 1.2,1.3,1.4,1.11,1.14,2.2,2.3,2.4,2.11,2.14 <(bedtools closest -iu -D a -a ${dREG_peak_score_plus} -b counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed| awk 'BEGIN {OFS="\t";t="_"}{print $1t$2, $0}') <(bedtools closest -iu -D a -a ${dREG_peak_score_minus} -b counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed|awk 'BEGIN {OFS="\t";t="_"}{print $1t$3, $0}')\
-|awk '($5 != -1 && $10 !=-1 && $5<=150 && $10<=150) {print $0}' | awk '(substr($4,1,1) == substr($9,1,1)){print $0} '
+|awk -v d=$d '($5 != -1 && $10 !=-1 && $5<=d && $10<=d) {print $0}' | awk '(substr($4,1,1) == substr($9,1,1)){print $0} ' | wc -l
+#join -t $'\t' -j 1 -o 1.2,1.3,1.4,1.11,1.14,2.2,2.3,2.4,2.11,2.14 <(bedtools closest -iu -D a -a ${dREG_peak_score_plus} -b counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed| awk 'BEGIN {OFS="\t";t="_"}{print $1t$2, $0}') <(bedtools closest -iu -D a -a ${dREG_peak_score_minus} -b counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed|awk 'BEGIN {OFS="\t";t="_"}{print $1t$3, $0}')\
+#|awk -v d=$d '($5 != -1 && $10 !=-1 && $5<=d && $10<=d) {print $0}' | awk '(substr($4,1,1) == substr($9,1,1)){print $0} '
 
 # Discordant
 join -t $'\t' -j 1 -o 1.2,1.3,1.4,1.11,1.14,2.2,2.3,2.4,2.11,2.14 <(bedtools closest -iu -D a -a ${dREG_peak_score_plus} -b counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed| awk 'BEGIN {OFS="\t";t="_"}{print $1t$2, $0}') <(bedtools closest -iu -D a -a ${dREG_peak_score_minus} -b counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed|awk 'BEGIN {OFS="\t";t="_"}{print $1t$3, $0}')\
-|awk '($5 != -1 && $10 !=-1 && $5<=1500 && $10<=1500) {print $0}' | awk '(substr($4,1,1) != substr($9,1,1)){print $0} ' | wc -l
+|awk -v d=$d '($5 != -1 && $10 !=-1 && $5<=d && $10<=d) {print $0}' | awk '(substr($4,1,1) != substr($9,1,1)){print $0} ' | wc -l
 
-#paste <(bedtools closest -iu -D a -a ${dREG_peak_score_plus} -b counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed) <(bedtools closest -iu -D a -a ${dREG_peak_score_minus} -b counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed)\
-#|awk '($13 != -1 && $NF !=-1 && $13<=150 && $NF<=150) {print $0}' | awk '(substr($10,1,1) != substr($23,1,1)){print $0} '|wc -l
-#paste <(bedtools closest -iu -D a -a ${dREG_peak_score_plus} -b counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed) <(bedtools closest -iu -D a -a ${dREG_peak_score_minus} -b counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed)\
-#|awk '($13 != -1 && $NF !=-1 && $13<=150 && $NF<=150) {print $0}' | awk '{OFS="\t"} (substr($10,1,1) != substr($23,1,1)){print $0}' |awk 'BEGIN {OFS="\t"; C="Concordant"; D="Discordant"} {print$1,$15-250,$3+250, $10, $23, D}'  
-
-
-#####NEED to fix $15-250 < $3+250!!!
+d=150
 # put Con and Dis together
-echo -e "chrm\tchrmStart\tchrmEnd\tPlusStrandState\tMinusStrandState\tCon_Dis" > Con_Dis_regions.bed
+echo -e "chrm\tchrmStart\tchrmEnd\tCon_Dis\tPlusStrandState\tMinusStrandState" > Con_Dis_regions_t1e-0${T}.bed
 join -t $'\t' -j 1 -o 1.2,1.3,1.4,1.11,1.14,2.2,2.3,2.4,2.11,2.14 <(bedtools closest -iu -D a -a ${dREG_peak_score_plus} -b counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed| awk 'BEGIN {OFS="\t";t="_"}{print $1t$2, $0}') <(bedtools closest -iu -D a -a ${dREG_peak_score_minus} -b counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed|awk 'BEGIN {OFS="\t";t="_"}{print $1t$3, $0}')\
-|awk '($5 != -1 && $10 !=-1 && $5<=150 && $10<=150) {print $0}' | awk 'BEGIN {OFS="\t"; C="Concordant"; D="Discordant"} (substr($4,1,1) != substr($9,1,1)){print$1,$7-250,$3+250, $4, $9, D}; (substr($4,1,1) == substr($9,1,1)){print$1,$7-250,$3+250, $4, $9, C} '>> Con_Dis_regions.bed
-
-
-
-#paste <(bedtools closest -iu -D a -a ${dREG_peak_score_plus} -b counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed) <(bedtools closest -iu -D a -a ${dREG_peak_score_minus} -b counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed)\
-#|awk '($13 != -1 && $NF !=-1 && $13<=150 && $NF<=150) {print $0}' | awk 'BEGIN {OFS="\t"; C="Concordant"; D="Discordant"} (substr($10,1,1) != substr($23,1,1)){print$1,$15-250,$3+250, $10, $23, D};(substr($10,1,1) == substr($23,1,1)){print$1,$15-250,$3+250, $10, $23, C}' >> Con_Dis_regions.bed
+|awk -v d=$d '($5 != -1 && $10 !=-1 && $5<=d && $10<=d) {print $0}' | awk 'BEGIN {OFS="\t"; C="Con"; D="Dis"} (substr($4,1,1) != substr($9,1,1)){print$1,$7-250,$3+250, D, $4, $9}; (substr($4,1,1) == substr($9,1,1)){print$1,$7-250,$3+250, C, $4, $9} '>> Con_Dis_regions_t1e-0${T}.bed
 
 # Concordant plus and minus change in the same direction, Discordant change in opposite direction.
 # filter the Concordant region to remove the Regions with large difference between plus and minus strand (although same direction, but different in amplitude).
-R --vanilla --slave --args $(pwd) Con_Dis_regions.bed < Con_Dis_hmm_scatterplot.R
-# oupput is Con_Dis_regions_ConFiltered.bed
+R --vanilla --slave --args $(pwd) Con_Dis_regions_t1e-0${T}.bed < Con_Dis_hmm_scatterplot.R
+# oupput is Con_Dis_regions_t1e-0${T}_ConFiltered.bed 
 
 ##################
 # Motif analysis #
 ##################
-mkdir Motif_SNPs_Anaylsis
+mkdir Motif_SNPs_Anaylsis_t1e-0${T}
 # identify SNPs overlap with Concordant or Discordant regions
-intersectBed -wa -a <(LC_ALL=C sort --temporary-directory=/workdir/sc2457/tmp/ --parallel=10 -V /workdir/sc2457/mouse_AlleleSpecific/mouse_genome.sanger.ac.uk/REL-1505-SNPs_Indels/PersonalGenome_P.CAST_M.B6_indelsNsnps_CAST.bam/P.CAST_M.B6_indelsNsnps_CAST.bam.alleleDBInput.snp.bed) -b Con_Dis_regions_ConFiltered.bed > Motif_SNPs_Anaylsis/Con_Dis_regions_ConFiltered.snp.bed  
+intersectBed -wa -a /workdir/sc2457/mouse_AlleleSpecific/mouse_genome.sanger.ac.uk/REL-1505-SNPs_Indels/PersonalGenome_P.CAST_M.B6_indelsNsnps_CAST.bam/P.CAST_M.B6_indelsNsnps_CAST.bam.alleleDBInput.snp.sorted.bed -b Con_Dis_regions_t1e-0${T}_ConFiltered.bed > Motif_SNPs_Anaylsis_t1e-0${T}/Con_Dis_regions_t1e-0${T}_ConFiltered.snp.bed  
 
-cd Motif_SNPs_Anaylsis
-grep Concordant ../Con_Dis_regions_ConFiltered.bed > Concordant.bed
-grep Discordant ../Con_Dis_regions_ConFiltered.bed > Discordant.bed
+cd Motif_SNPs_Anaylsis_t1e-0${T}
+grep Con ../Con_Dis_regions_t1e-0${T}_ConFiltered.bed > Concordant.bed
+grep Dis ../Con_Dis_regions_t1e-0${T}_ConFiltered.bed > Discordant.bed
 
 # use rtfbsdb to scan the concrdant and discordant region for motif
 PL=/workdir/sc2457/tools/After_AlleleDB_pipeline
 export R_LIBS=/home/zw355/R/x86_64-unknown-linux-gnu-library/3.1
 #export R_LIBS=/home/sc2457/R/x86_64-pc-linux-gnu-library/3.3
-R --vanilla --slave --args $(pwd) ../Con_Dis_regions_ConFiltered.bed < ${PL}/rtfbsdb_scan.R
+R --vanilla --slave --args $(pwd) ../Con_Dis_regions_t1e-0${T}_ConFiltered.bed < ${PL}/rtfbsdb_scan.R
 
 unstarch scan.db.db.starch >scan.db.db.starch.unstarched
 
@@ -194,9 +190,10 @@ do
   cat tfbs.scanTFsite_${tf} |awk 'BEGIN {OFS="\t"} {print $1, $2, $3}'|LC_ALL=C sort -V  |uniq > tfbs.scanTFsite_${tf}_uniq
   # identify motif sites overlap with SNPs
   # might have duplicates of binding sites due to more than one SNP is a region, but this will be taken care later in the pipeline
-  intersectBed -wa -a tfbs.scanTFsite_${tf}_uniq -b Con_Dis_regions_ConFiltered.snp.bed > tfbs.scanTFsite_${tf}_wSNP.bed &
+  intersectBed -wa -a tfbs.scanTFsite_${tf}_uniq -b Con_Dis_regions_t1e-0${T}_ConFiltered.snp.bed > tfbs.scanTFsite_${tf}_wSNP.bed &
 done
 
+mkdir toremove
 mv TF_SNP_Motif_count toremove/.
 for tf in `cat tfbs.scanTFsite.summary |awk '(NR>1){print $3}'|sort |uniq`
 do
@@ -212,14 +209,14 @@ do
   intersectBed -wa -wb -a tfbs.scanTFsite_${tf}_uniq -b Concordant.bed | awk '{print $4, $5, $6}' |sort |uniq |wc -l >> TF_SNP_Motif_count
 done
 
-#mkdir toremove
-#mv Concordant.bed Discordant.bed toremove/.
-#mv tfbs.scanTFsite_* toremove/.
+
 
 python ${PL}/FisherExactTest_Motif_SNPs.py TF_SNP_Motif_count
 R --vanilla --slave --args $(pwd) Fisher_excat_test.txt < ${PL}/FisherExactTest_Motif_SNPs_volcano.R 
 
 
+mv Concordant.bed Discordant.bed toremove/.
+mv tfbs.scanTFsite_* toremove/.
 
 
 #make bed for http://epigenomegateway.wustl.edu/
