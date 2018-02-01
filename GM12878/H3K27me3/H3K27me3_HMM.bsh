@@ -16,3 +16,331 @@ for f in *.cnt.gz; do zcat $f >  ${f:0:11}.cnt ; done
 for f in *.cnt
 	do make -f PIPELINE_startWith_cnt.mk PREFIX=${f:0:11}
 done
+
+mkdir toremove 
+mv *.cnt toremove/.
+
+
+
+#locations of pipeline
+PL=/workdir/sc2457/tools/After_AlleleDB_pipeline
+ln -s /workdir/sc2457/mouse_AlleleSpecific/allelicbias-PersonalGenome_P.CAST_M.B6-LEP_ZYG_ATGCA_forAlleleDB/Tm_Tp_fixed_redo/hmm_spc.py .
+
+
+#### get hmm regions start ####
+for f in *.cnt.gz
+do j=${f:0:11}
+# only anaysis autosome now
+grep -v X ${j}_counts.txt > ${j}_counts_noX.txt
+
+# filter input files based on Min reads count and Max P-value
+Min_count=1
+Max_Pvalus=1
+R --vanilla --slave --args $(pwd) ${j}_counts_noX.txt ${Min_count} ${Max_Pvalus} < ${PL}/filter_counts_file.R 
+
+# $18 0.5 <= CNV <= 1.5
+# use for hmm training
+# $8 <0.038 is from allelicbias-PersonalGenome_P.CAST_M.B6-LEP_ZYG_ATGCA_forAlleleDB
+p=0.038
+
+Input_counts=${j}_counts_noX_MinCount${Min_count}_MaxPvalue${Max_Pvalus}.txt
+head ${Input_counts} -n 1 |awk 'BEGIN{OFS="\t"} {print $1,$2,$19, $20, $21, "state"}' > ${j}_counts_hmm.txt 
+cat ${Input_counts}| \
+awk 'BEGIN{OFS="\t"} ($18 <1.5 && $18 >0.5) {print $1,$2,$19, $20, $21,$14,$15,$16}' |\
+awk -v p=$p 'BEGIN{OFS="\t"} ($8 <p) {print $1,$2,$3, $4, $5, $6}; ($8 >=p){print $1,$2,$3, $4, $5, "S"}' >> ${j}_counts_hmm.txt 
+done
+
+for f in *_counts_hmm.txt
+do python hmm_spc.py $f $f - 22 &
+done
+wait
+
+# make a file with combined reads count
+for f in *.cnt.gz
+do j=${f:0:11}
+cat ${j}_counts_hmm.txt| awk '{OFS="\t"} NR>1 {print $1"_"$2, $0}'|LC_ALL=C sort -k1,1 --parallel=30 > A_${j}_counts_hmm.tmp
+cat ${j}_counts_hmm.txt| awk '{OFS="\t"} NR>1 {print $1"_"$2}' >> A_header.tmp
+done
+
+cat A_header.tmp | LC_ALL=C sort -k1,1 --parallel=30 > A_header_uniq.tmp
+LC_ALL=C join -a1 -e0 -t $'\t' -j 1 -o 1.1,2.4,2.5,2.6 A_header_uniq.tmp A_ENCFF000ASV_counts_hmm.tmp > A_total_counts_hmm.tmp1
+LC_ALL=C join -a1 -e0 -t $'\t' -j 1 -o 1.1,1.2,1.3,1.4,2.4,2.5,2.6 A_total_counts_hmm.tmp1 A_ENCFF000ASW_counts_hmm.tmp > A_total_counts_hmm.tmp2
+LC_ALL=C join -a1 -e0 -t $'\t' -j 1 -o 1.1,1.2,1.3,1.4,1.5,1.6,1.7,2.4,2.5,2.6 A_total_counts_hmm.tmp2 A_ENCFF000ASZ_counts_hmm.tmp > A_total_counts_hmm.tmp3
+LC_ALL=C join -a1 -e0 -t $'\t' -j 1 -o 1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,1.10,2.4,2.5,2.6 A_total_counts_hmm.tmp3 A_ENCFF001EXM_counts_hmm.tmp > A_total_counts_hmm.tmp4
+LC_ALL=C join -a1 -e0 -t $'\t' -j 1 -o 1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,1.10,1.11,1.12,1.13,2.4,2.5,2.6 A_total_counts_hmm.tmp4 A_ENCFF001EXO_counts_hmm.tmp > A_total_counts_hmm.tmp5
+cat A_total_counts_hmm.tmp5 |awk 'BEGIN {OFS="\t"} {print $1, $2+$5+$8+$11+$14, $3+$6+$9+$12+$15, $4+$7+$10+$13+$16}' \
+ |awk 'BEGIN {FS="_"; OFS="\t"} {print $1, $2, "S"}' |LC_ALL=C sort -k2 --parallel=30 > H3K27me3_counts_hmm.txt
+ rm A_*.tmp A_total_counts_hmm.tmp*
+python hmm_spc.py H3K27me3_counts_hmm.txt H3K27me3_counts_hmm.txt - 22
+
+
+#### get hmm regions end ####
+
+#### get allele-specific reads start ####
+# need bowtie files to identify reads in HMM regions
+PL=/workdir/sc2457/alleleDB/alleledb_pipeline
+PGENOME_PATH=/workdir/sc2457/alleleseq.gersteinlab.org/NA12878_diploid/NA12878_diploid_2015_feb5_3versions/1kgp3-svs-pass_NA12878_hg19_150109_w_transcriptome
+for f in *.fastq.gz
+	do FASTQ=${f:0:11}
+${PL}/alleledb_filter_input.sh ${PL} $f | bowtie --best --strata -p 20 -v 2 -m 1 -f ${PGENOME_PATH}/AltRefMother/AltRefMother - > ${FASTQ}.mat.bowtie 2> ${FASTQ}.mat.log & 
+${PL}/alleledb_filter_input.sh ${PL} $f | bowtie --best --strata -p 20 -v 2 -m 1 -f ${PGENOME_PATH}/AltRefFather/AltRefFather - > ${FASTQ}.pat.bowtie 2> ${FASTQ}.pat.log &
+done
+wait
+
+
+for f in *.cnt.gz
+	do j=`find ../ENCODE_results_in_batch/ -type f | grep allelicbias-NA12878_hg19_150109-${f:0:11}/originalmatpatreads.toremove.ids`
+echo $j
+cp $j ${f:0:11}.originalmatpatreads.toremove.ids
+done
+
+
+
+PL=/workdir/sc2457/alleleDB/alleledb_pipeline
+MAPS=/workdir/sc2457/alleleseq.gersteinlab.org/NA12878_diploid/NA12878_diploid_2015_feb5_3versions/1kgp3-svs-pass_NA12878_hg19_150109_w_transcriptome/%s_NA12878.map
+
+# remove AMB reads and sort by index
+for f in *.cnt.gz
+do j=${f:0:11}
+PATBOWTIE=${j}.pat.bowtie
+MATBOWTIE=${j}.mat.bowtie
+python ${PL}/filter_reads_out.py ${PATBOWTIE} - ${j}.originalmatpatreads.toremove.ids | LC_ALL=C  sort -k1 -n  --parallel=30 -o ${PATBOWTIE}_AMBremoved_sorted &
+python ${PL}/filter_reads_out.py ${MATBOWTIE} - ${j}.originalmatpatreads.toremove.ids | LC_ALL=C  sort -k1 -n  --parallel=30 -o ${MATBOWTIE}_AMBremoved_sorted &
+done
+wait
+
+# seperate mat and pat reads from bowtie output
+# order matters! ${PATBOWTIE}_AMBremoved_sorted need to be in front of ${MATBOWTIE}_AMBremoved_sorted !!!
+for f in *.cnt.gz
+do j=${f:0:11}
+PATBOWTIE=${j}.pat.bowtie
+MATBOWTIE=${j}.mat.bowtie
+python ${PL}/seperate_mat_pat_reads_withSNPs.py ${PATBOWTIE}_AMBremoved_sorted ${MATBOWTIE}_AMBremoved_sorted ${MAPS} &
+# output is ${PATBOWTIE}_AMBremoved_sorted_specific.bowtie ${PATBOWTIE}_AMBremoved_sorted_identical.bowtie ${MATBOWTIE}_AMBremoved_sorted_specific.bowtie ${MAPS}
+done
+wait
+
+
+# make bed file from bowtie
+for f in *.cnt.gz
+do j=${f:0:11}
+PATBOWTIE=${j}.pat.bowtie
+MATBOWTIE=${j}.mat.bowtie
+cat ${MATBOWTIE}_AMBremoved_sorted_specific.bowtie | awk 'BEGIN {FS= "\t"; OFS="\t"; t="#*o*#"} {print $3, $4, $4+length($5), $1t$5t$2t$6, 111, $2}' > ${MATBOWTIE}_AMBremoved_sorted_specific.bed &
+cat ${PATBOWTIE}_AMBremoved_sorted_specific.bowtie | awk 'BEGIN {FS= "\t"; OFS="\t"; t="#*o*#"} {print $3, $4, $4+length($5), $1t$5t$2t$6, 111, $2}' > ${PATBOWTIE}_AMBremoved_sorted_specific.bed &
+cat ${PATBOWTIE}_AMBremoved_sorted_identical.bowtie| awk 'BEGIN {FS= "\t"; OFS="\t"; t="#*o*#"} {print $3, $4, $4+length($5), $1t$5t$2t$6, 111, $2}' > ${PATBOWTIE}_AMBremoved_sorted_identical.bed &
+done
+wait
+
+# liftOver to reference genome
+# usage: liftOver oldFile map.chain newFile unMapped
+PATH2ref=/workdir/sc2457/alleleseq.gersteinlab.org/NA12878_diploid/NA12878_diploid_2015_feb5_3versions/1kgp3-svs-pass_NA12878_hg19_150109_w_transcriptome/
+for f in *.cnt.gz
+do j=${f:0:11}
+PATBOWTIE=${j}.pat.bowtie
+MATBOWTIE=${j}.mat.bowtie
+liftOver ${MATBOWTIE}_AMBremoved_sorted_specific.bed ${PATH2ref}/mat2ref.chain  ${MATBOWTIE}_AMBremoved_sorted_specific.map2ref.bed ${MATBOWTIE}_AMBremoved_sorted_specific.unmap2ref.log &
+liftOver ${PATBOWTIE}_AMBremoved_sorted_specific.bed ${PATH2ref}/pat2ref.chain  ${PATBOWTIE}_AMBremoved_sorted_specific.map2ref.bed ${PATBOWTIE}_AMBremoved_sorted_specific.unmap2ref.log &
+liftOver ${PATBOWTIE}_AMBremoved_sorted_identical.bed ${PATH2ref}/pat2ref.chain  ${PATBOWTIE}_AMBremoved_sorted_identical.map2ref.bed ${PATBOWTIE}_AMBremoved_sorted_identical.unmap2ref.log &
+done
+wait
+
+for f in *.cnt.gz
+do j=${f:0:11}
+PATBOWTIE=${j}.pat.bowtie
+MATBOWTIE=${j}.mat.bowtie
+cat ${PATBOWTIE}_AMBremoved_sorted_identical.map2ref.bed | awk '{print "chr"$0}' | LC_ALL=C sort -k1,1V -k2,2n --parallel=30 > ${PATBOWTIE}_AMBremoved_sorted_identical.map2ref.sorted.bed &
+
+# remove reads that DONOT overlape with a SNP in ${PATBOWTIE}_AMBremoved_sorted_specific.map2ref.sorted.bed and  ${MATBOWTIE}_AMBremoved_sorted_specific.map2ref.sorted.bed 
+intersectBed -sorted -u -a <(LC_ALL=C sort -k1,1V -k2,2n --parallel=30 ${MATBOWTIE}_AMBremoved_sorted_specific.map2ref.bed |awk '{print "chr"$0}') \
+-b /workdir/sc2457/SNP/1000genome_vol1.ftp.release.20130502/snp.calls.bed > ${MATBOWTIE}_AMBremoved_sorted_specific.map2ref.sorted.bed &
+intersectBed -sorted -u -a <(LC_ALL=C sort -k1,1V -k2,2n --parallel=30 ${PATBOWTIE}_AMBremoved_sorted_specific.map2ref.bed |awk '{print "chr"$0}') \
+-b /workdir/sc2457/SNP/1000genome_vol1.ftp.release.20130502/snp.calls.bed > ${PATBOWTIE}_AMBremoved_sorted_specific.map2ref.sorted.bed &
+done
+wait
+
+mkdir toremove
+for f in *.cnt.gz
+do j=${f:0:11}
+PATBOWTIE=${j}.pat.bowtie
+MATBOWTIE=${j}.mat.bowtie
+mv ${PATBOWTIE}_AMBremoved_sorted_identical.bowtie ${PATBOWTIE}_AMBremoved_sorted_specific.bowtie ${MATBOWTIE}_AMBremoved_sorted_specific.bowtie toremove/.
+mv ${PATBOWTIE}_AMBremoved_sorted ${MATBOWTIE}_AMBremoved_sorted toremove/.
+mv ${MATBOWTIE}_AMBremoved_sorted_specific.bed ${PATBOWTIE}_AMBremoved_sorted_specific.bed ${PATBOWTIE}_AMBremoved_sorted_identical.bed toremove/.
+done
+mv *.map2ref.bed toremove/.
+mv *originalmatpatreads.toremove.ids *_counts.log toremove/.
+
+#### get allele-specific reads end ####
+
+#### perferm binomial test on hmm regions start ####
+ln -s /workdir/sc2457/mouse_AlleleSpecific/allelicbias-PersonalGenome_P.CAST_M.B6-LEP_ZYG_ATGCA_forAlleleDB/Tm_Tp_fixed_redo/sum_of_counts.py .
+ln -s /workdir/sc2457/mouse_AlleleSpecific/allelicbias-PersonalGenome_P.CAST_M.B6-LEP_ZYG_ATGCA_forAlleleDB/Tm_Tp_fixed_redo/getFractionOfBlock_DistanceToNearestSites.R .
+ln -s /workdir/sc2457/tools/After_AlleleDB_pipeline/tss_paired_gm12878_plus.bed .
+ln -s /workdir/sc2457/tools/After_AlleleDB_pipeline/tss_paired_gm12878_minus.bed .
+
+
+### counts the maternal, paternal reads, and the reads that cannot tell where it from, in the regions of hmm predictions
+# perform BinomialTest and filter by FDR<= FDR_CUTOFF
+# NO strandness!!!
+PL=/workdir/sc2457/alleleDB/alleledb_pipeline
+FDR_SIMS=10
+FDR_CUTOFF=0.1
+for f in *.cnt.gz
+do j=${f:0:11} ; PATBOWTIE=${j}.pat.bowtie ; MATBOWTIE=${j}.mat.bowtie
+  for T in {1..9}
+  do echo ${j}_counts_hmm_regions_t1e-0${T}.bed
+  	bedtools coverage -a <(cat ${j}_counts_hmm_regions_t1e-0${T}.bed |awk '{print "chr"$0}') -b ${MATBOWTIE}_AMBremoved_sorted_specific.map2ref.sorted.bed | awk 'BEGIN {OFS="\t"; t="_"} {print $1t$2t$3, $0}' |LC_ALL=C sort -k1,1 --parallel=30 > ${j}_counts_hmm_regions_t1e-0${T}.mat_cov.bed &
+    bedtools coverage -a <(cat ${j}_counts_hmm_regions_t1e-0${T}.bed |awk '{print "chr"$0}') -b ${PATBOWTIE}_AMBremoved_sorted_specific.map2ref.sorted.bed | awk 'BEGIN {OFS="\t"; t="_"} {print $1t$2t$3, $0}' |LC_ALL=C sort -k1,1 --parallel=30 > ${j}_counts_hmm_regions_t1e-0${T}.pat_cov.bed &
+  done
+wait
+for T in {1..9}
+  do join -t $'\t' -j 1 -o 1.1,1.2,1.3,1.4,1.5,1.8,2.8 ${j}_counts_hmm_regions_t1e-0${T}.mat_cov.bed ${j}_counts_hmm_regions_t1e-0${T}.pat_cov.bed > ${j}_counts_hmm_regions_t1e-0${T}.temp_cov.bed &
+  bedtools coverage -a <(cat ${j}_counts_hmm_regions_t1e-0${T}.bed |awk '{print "chr"$0}') -b ${PATBOWTIE}_AMBremoved_sorted_identical.map2ref.sorted.bed | awk 'BEGIN {OFS="\t"; t="_"} {print $1t$2t$3, $0}' |LC_ALL=C sort -k1,1 --parallel=30 > ${j}_counts_hmm_regions_t1e-0${T}.iden_cov.bed &
+done
+wait
+for T in {1..9}
+  do join -t $'\t' -j 1 -o 1.2,1.3,1.4,1.5,1.6,1.7,2.8 ${j}_counts_hmm_regions_t1e-0${T}.temp_cov.bed ${j}_counts_hmm_regions_t1e-0${T}.iden_cov.bed | LC_ALL=C sort -k1,1n -k2,2n --parallel=30 > ${j}_counts_hmm_regions_t1e-0${T}.merged_cov.bed &
+  done
+done
+wait
+for f in *.cnt.gz
+do j=${f:0:11} ; PATBOWTIE=${j}.pat.bowtie ; MATBOWTIE=${j}.mat.bowtie
+  for T in {1..9}
+  do
+  rm ${j}_counts_hmm_regions_t1e-0${T}.temp_cov.bed ${j}_counts_hmm_regions_t1e-0${T}.mat_cov.bed ${j}_counts_hmm_regions_t1e-0${T}.pat_cov.bed ${j}_counts_hmm_regions_t1e-0${T}.iden_cov.bed
+  python ${PL}/BinomialTestFor_merged_cov.bed.py ${j}_counts_hmm_regions_t1e-0${T}.merged_cov.bed ${j}_counts_hmm_regions_t1e-0${T}.merged_cov_binomtest.bed
+  rm ${j}_counts_hmm_regions_t1e-0${T}.merged_cov.bed
+# output of BinomialTestFor_merged_cov.bed.py:(hmm+BinomialTest) if p-value <= 0.05, remain what it got from hmm (can ne M,P, or S), otherwise S.
+  python ${PL}/FalsePosFor_merged_cov.bed.py ${j}_counts_hmm_regions_t1e-0${T}.merged_cov_binomtest.bed ${FDR_SIMS} ${FDR_CUTOFF} > ${j}_counts_hmm_regions_t1e-0${T}.merged_cov_binomtest_FDR.txt
+  awk 'NR==1 { print $0 } NR>1 && $9 <= thresh { print $0 }'  thresh=$(awk 'END {print $6}' ${j}_counts_hmm_regions_t1e-0${T}.merged_cov_binomtest_FDR.txt) < ${j}_counts_hmm_regions_t1e-0${T}.merged_cov_binomtest.bed > ${j}_counts_hmm_regions_t1e-0${T}_interestingHets.bed &
+  done
+done
+
+### Combined reads
+PL=/workdir/sc2457/alleleDB/alleledb_pipeline
+FDR_SIMS=10
+FDR_CUTOFF=0.1
+for f in *.cnt.gz
+do j=${f:0:11} ; PATBOWTIE=${j}.pat.bowtie ; MATBOWTIE=${j}.mat.bowtie
+cat ${MATBOWTIE}_AMBremoved_sorted_specific.map2ref.sorted.bed >> H3K27me3.mat.bowtie_AMBremoved_sorted_specific.map2ref.bed
+cat ${PATBOWTIE}_AMBremoved_sorted_specific.map2ref.sorted.bed >> H3K27me3.pat.bowtie_AMBremoved_sorted_specific.map2ref.bed
+cat ${PATBOWTIE}_AMBremoved_sorted_identical.map2ref.sorted.bed  >> H3K27me3.pat.bowtie_AMBremoved_sorted_identical.map2ref.bed
+done
+
+for f in H3K27me3.*.map2ref.bed
+	do echo $f
+cat $f |  LC_ALL=C sort -k1,1V -k2,2n --parallel=30 > ${f%bed}sorted.bed
+mv $f toremove/.
+done
+
+j=H3K27me3
+for T in {1..9}
+  do echo ${j}_counts_hmm_regions_t1e-0${T}.bed
+  	bedtools coverage -a <(cat ${j}_counts_hmm_regions_t1e-0${T}.bed |awk '{print "chr"$0}') -b ${MATBOWTIE}_AMBremoved_sorted_specific.map2ref.sorted.bed | awk 'BEGIN {OFS="\t"; t="_"} {print $1t$2t$3, $0}' |LC_ALL=C sort -k1,1 --parallel=30 > ${j}_counts_hmm_regions_t1e-0${T}.mat_cov.bed &
+    bedtools coverage -a <(cat ${j}_counts_hmm_regions_t1e-0${T}.bed |awk '{print "chr"$0}') -b ${PATBOWTIE}_AMBremoved_sorted_specific.map2ref.sorted.bed | awk 'BEGIN {OFS="\t"; t="_"} {print $1t$2t$3, $0}' |LC_ALL=C sort -k1,1 --parallel=30 > ${j}_counts_hmm_regions_t1e-0${T}.pat_cov.bed &
+  done
+wait
+for T in {1..9}
+  do join -t $'\t' -j 1 -o 1.1,1.2,1.3,1.4,1.5,1.8,2.8 ${j}_counts_hmm_regions_t1e-0${T}.mat_cov.bed ${j}_counts_hmm_regions_t1e-0${T}.pat_cov.bed > ${j}_counts_hmm_regions_t1e-0${T}.temp_cov.bed &
+  bedtools coverage -a <(cat ${j}_counts_hmm_regions_t1e-0${T}.bed |awk '{print "chr"$0}') -b ${PATBOWTIE}_AMBremoved_sorted_identical.map2ref.sorted.bed | awk 'BEGIN {OFS="\t"; t="_"} {print $1t$2t$3, $0}' |LC_ALL=C sort -k1,1 --parallel=30 > ${j}_counts_hmm_regions_t1e-0${T}.iden_cov.bed &
+done
+wait
+for T in {1..9}
+  do join -t $'\t' -j 1 -o 1.2,1.3,1.4,1.5,1.6,1.7,2.8 ${j}_counts_hmm_regions_t1e-0${T}.temp_cov.bed ${j}_counts_hmm_regions_t1e-0${T}.iden_cov.bed | LC_ALL=C sort -k1,1n -k2,2n --parallel=30 > ${j}_counts_hmm_regions_t1e-0${T}.merged_cov.bed &
+done
+wait
+FDR_SIMS=10
+FDR_CUTOFF=0.1
+for T in {1..9}
+  do
+  python ${PL}/BinomialTestFor_merged_cov.bed.py ${j}_counts_hmm_regions_t1e-0${T}.merged_cov.bed ${j}_counts_hmm_regions_t1e-0${T}.merged_cov_binomtest.bed
+# output of BinomialTestFor_merged_cov.bed.py:(hmm+BinomialTest) if p-value <= 0.05, remain what it got from hmm (can ne M,P, or S), otherwise S.
+  python ${PL}/FalsePosFor_merged_cov.bed.py ${j}_counts_hmm_regions_t1e-0${T}.merged_cov_binomtest.bed ${FDR_SIMS} ${FDR_CUTOFF} > ${j}_counts_hmm_regions_t1e-0${T}.merged_cov_binomtest_FDR.txt &
+done
+wait
+
+for T in {1..9}
+  do
+  rm ${j}_counts_hmm_regions_t1e-0${T}.temp_cov.bed ${j}_counts_hmm_regions_t1e-0${T}.mat_cov.bed ${j}_counts_hmm_regions_t1e-0${T}.pat_cov.bed ${j}_counts_hmm_regions_t1e-0${T}.iden_cov.bed
+  rm ${j}_counts_hmm_regions_t1e-0${T}.merged_cov.bed
+  awk 'NR==1 { print $0 } NR>1 && $9 <= thresh { print $0 }'  thresh=$(awk 'END {print $6}' ${j}_counts_hmm_regions_t1e-0${T}.merged_cov_binomtest_FDR.txt) < ${j}_counts_hmm_regions_t1e-0${T}.merged_cov_binomtest.bed > ${j}_counts_hmm_regions_t1e-0${T}_interestingHets.bed &
+done
+wait
+
+j=H3K27me3
+cat ${j}_counts_hmm_regions_t1e-0${T}.merged_cov_binomtest.bed |LC_ALL=C sort -k1,1V -k2,2n | awk 'BEGIN {OFS="\t"; t=","; s=" ";c="chr"} NR==1 { print $1,$2,$3,$4t$6t$7, 111, s} 
+NR>1 && $4!="S"  {print $1,$2,$3,$4t$6t$7, 111, s}' > ${j}_counts_hmm_regions_t1e-0${T}_merged_cov_binomtest_IGV.bed
+cat ${j}_counts_hmm_regions_t1e-0${T}_interestingHets.bed |LC_ALL=C sort -k1,1V -k2,2n | awk 'BEGIN {OFS="\t"; t=","; s=" ";c="chr"} NR==1 { print $1,$2,$3,$4t$6t$7, 111, s} 
+NR>1 && $4!="S"  {print $1,$2,$3,$4t$6t$7, 111, s}' > ${j}_counts_hmm_regions_t1e-0${T}_interestingHets_IGV.bed
+
+
+###
+
+### make bed with only the 5prime head reads
+for f in *.cnt.gz
+do j=${f:0:11} ; PATBOWTIE=${j}.pat.bowtie ; MATBOWTIE=${j}.mat.bowtie
+  for T in {1..9}
+# filter and only keep M and P, use the state from hmm(hmm_state, Not hmm+BinomialTest ), which binomial test pass FDR <0.1
+do cat ${j}_counts_hmm_regions_t1e-0${T}_interestingHets.bed | awk 'BEGIN {OFS="\t"; t=","; s=""} NR==1 { print $1,$2,$3,$4t$6t$7, 111, s} 
+NR>1 && $4!="S"  {print $1,$2,$2+1,$4t$6t$7, 111, s}' > ${j}_counts_hmm_regions_t1e-0${T}_interestingHets_5head.bed
+bedtools closest -d -a <(cat ${j}_counts_hmm_regions_t1e-0${T}_interestingHets_5head.bed | awk 'BEGIN {OFS="\t"} NR!=1 {print $0, "+"}' | LC_ALL=C sort -k1,1 -k2,2n --parallel=30) -b tss_paired_gm12878_plus.bed \
+|awk '{print $NF}'| LC_ALL=C sort --temporary-directory=/workdir/sc2457/tmp/ --parallel=10 -n | uniq -c > ${j}_counts_hmm_regions_t1e-0${T}_interestingHets_5head_distance_toclosest-dReg_Counts.txt
+python sum_of_counts.py ${j}_counts_hmm_regions_t1e-0${T}_interestingHets_5head_distance_toclosest-dReg_Counts.txt `awk 'END {print $2}' ${j}_counts_hmm_regions_t1e-0${T}_interestingHets_5head_distance_toclosest-dReg_Counts.txt` > ${j}_counts_hmm_regions_t1e-0${T}_interestingHets_5head_distance_toclosest-dReg_AccumulateCounts.txt 
+done
+done
+
+### make figures
+for f in *.cnt.gz
+do j=${f:0:11} 
+x=${j}_counts_hmm_regions_t*_interestingHets_5head_distance_toclosest-dReg_AccumulateCounts.txt
+R --vanilla --slave --args $(pwd) "$x" ${j}_counts_hmm_regions_tX_interestingHets_5head_distance_toclosest-dReg_AccumulateCounts.pdf ${j}_counts_hmm_regions_tX_interestingHets_5head_distance_toclosest-dReg_At5Kb.pdf < getFractionOfBlock_DistanceToNearestSites.R
+done
+
+T=5
+for f in *.cnt.gz
+do j=${f:0:11} 
+cat ${j}_counts_hmm_regions_t1e-0${T}_interestingHets.bed |LC_ALL=C sort -k1,1V -k2,2n | awk 'BEGIN {OFS="\t"; t=","; s=" ";c="chr"} NR==1 { print $1,$2,$3,$4t$6t$7, 111, s} 
+NR>1 && $4!="S"  {print $1,$2,$3,$4t$6t$7, 111, s}' > ${j}_counts_hmm_regions_t1e-0${T}_interestingHets_IGV.bed
+done
+
+
+#### H3K27me3 reads in GRO-seq regions
+T=5
+FDR_SIMS=10; FDR_CUTOFF=0.1
+for s in plus minus
+#do input_f=/workdir/sc2457/GM_GroSeq_AlleleDB_20170606/test_in_total/counts_${s}_hmm_regions_t1e-0${T}_interestingHets_IGV.bed
+do input_f=/workdir/sc2457/GM_GroSeq_AlleleDB_20170606/test_in_total/counts_${s}_hmm_regions_t1e-0${T}.merged_cov_binomtest_IGV.bed
+
+j=H3K27me3_${s}
+ 	bedtools coverage -a ${input_f} -b ${MATBOWTIE}_AMBremoved_sorted_specific.map2ref.sorted.bed | awk 'BEGIN {OFS="\t"; t="_"} {print $1t$2t$3, $0}'  > ${j}_counts_hmm_regions_t1e-0${T}.mat_cov.bed &
+    bedtools coverage -a ${input_f} -b ${PATBOWTIE}_AMBremoved_sorted_specific.map2ref.sorted.bed | awk 'BEGIN {OFS="\t"; t="_"} {print $1t$2t$3, $0}'  > ${j}_counts_hmm_regions_t1e-0${T}.pat_cov.bed &
+wait
+join -t $'\t' -j 1 -o 1.1,1.2,1.3,1.4,1.5,1.8,2.8 ${j}_counts_hmm_regions_t1e-0${T}.mat_cov.bed ${j}_counts_hmm_regions_t1e-0${T}.pat_cov.bed > ${j}_counts_hmm_regions_t1e-0${T}.temp_cov.bed &
+  bedtools coverage -a ${input_f} -b ${PATBOWTIE}_AMBremoved_sorted_identical.map2ref.sorted.bed | awk 'BEGIN {OFS="\t"; t="_"} {print $1t$2t$3, $0}'  > ${j}_counts_hmm_regions_t1e-0${T}.iden_cov.bed &
+wait
+  join -t $'\t' -j 1 -o 1.2,1.3,1.4,1.5,1.6,1.7,2.8 ${j}_counts_hmm_regions_t1e-0${T}.temp_cov.bed ${j}_counts_hmm_regions_t1e-0${T}.iden_cov.bed > ${j}_counts_hmm_regions_t1e-0${T}.merged_cov.bed &
+wait
+# here 
+FDR_SIMS=10; FDR_CUTOFF=0.1
+  python ${PL}/BinomialTestFor_merged_cov.bed.py ${j}_counts_hmm_regions_t1e-0${T}.merged_cov.bed ${j}_counts_hmm_regions_t1e-0${T}.merged_cov_binomtest.bed 
+  mv ${j}_counts_hmm_regions_t1e-0${T}.merged_cov_binomtest.bed tmp.bed
+  echo -e '#chrm\tchrmStart\tchrmEnd\tH3K27me3_BinomialTest\tGROseq_hmm_state\tmat_allele_count\tpat_allele_count\tidentical_reads_count\tBinom_p_value' > ${j}_counts_hmm_regions_t1e-0${T}.merged_cov_binomtest.bed 
+  # DID NOT filter out those regions where mat reads counts is equal to pat reads counts
+  cat tmp.bed |awk 'BEGIN{OFS="\t"; l=","} NR >1 && $6>$7 {print $1,$2,$3,"M,"$6l$7,$4,$6,$7,$8,$9} NR >1 && $6==$7 {print $1,$2,$3,"S,"$6l$7,$4,$6,$7,$8,$9}
+  NR >1 && $6<$7 {print $1,$2,$3,"P,"$6l$7,$4,$6,$7,$8,$9}' >> ${j}_counts_hmm_regions_t1e-0${T}.merged_cov_binomtest.bed 
+  rm tmp.bed
+
+# output of BinomialTestFor_merged_cov.bed.py:(hmm+BinomialTest) if p-value <= 0.05, remain what it got from hmm (can ne M,P, or S), otherwise S.
+  python ${PL}/FalsePosFor_merged_cov.bed.py ${j}_counts_hmm_regions_t1e-0${T}.merged_cov_binomtest.bed ${FDR_SIMS} ${FDR_CUTOFF} > ${j}_counts_hmm_regions_t1e-0${T}.merged_cov_binomtest_FDR.txt 
+  #rm ${j}_counts_hmm_regions_t1e-0${T}.temp_cov.bed ${j}_counts_hmm_regions_t1e-0${T}.mat_cov.bed ${j}_counts_hmm_regions_t1e-0${T}.pat_cov.bed ${j}_counts_hmm_regions_t1e-0${T}.iden_cov.bed
+  #rm ${j}_counts_hmm_regions_t1e-0${T}.merged_cov.bed
+  awk 'NR==1 { print $0 } NR>1 && $9 <= thresh { print $0 }'  thresh=$(awk 'END {print $6}' ${j}_counts_hmm_regions_t1e-0${T}.merged_cov_binomtest_FDR.txt) < ${j}_counts_hmm_regions_t1e-0${T}.merged_cov_binomtest.bed > ${j}_counts_hmm_regions_t1e-0${T}_interestingHets.bed
+done
+
+cat ${j}_counts_hmm_regions_t1e-0${T}.merged_cov_binomtest.bed | awk 'substr($4,1,1) !="S" && substr($5,1,1) !="S" {print $0}' | awk 'substr($4,1,1) == substr($5,1,1) {print $0}' | wc -l 
+cat ${j}_counts_hmm_regions_t1e-0${T}.merged_cov_binomtest.bed | awk 'substr($4,1,1) !="S" && substr($5,1,1) !="S" {print $0}'  | awk 'substr($4,1,1) != substr($5,1,1) {print $0}' | wc -l 
+
+cat ${j}_counts_hmm_regions_t1e-0${T}_interestingHets.bed | awk 'substr($4,1,1) !="S" && substr($5,1,1) !="S" {print $0}' | awk 'substr($4,1,1) == substr($5,1,1) {print $0}' | wc -l 
+cat ${j}_counts_hmm_regions_t1e-0${T}_interestingHets.bed | awk 'substr($4,1,1) !="S" && substr($5,1,1) !="S" {print $0}' | awk 'substr($4,1,1) != substr($5,1,1) {print $0}' | wc -l 
+

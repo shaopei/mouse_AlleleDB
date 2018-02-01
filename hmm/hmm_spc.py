@@ -314,8 +314,11 @@ def run_em_T_mp_fixed(t):
         p_Y_f_list.append(p_Y_f)
         new_T_list.append(new_T)
         new_P_list.append(new_P)
-    make_em_plot(p_Y_f_list,"count_min=1 Tmx, Tpx fixed, t="+str(t)+", Tsx allow change for EM", "em_p_Y_f_list_plot_count_min=1_Tmpfixed_t="+str(t)+".pdf")
-    make_em_plot(p_Y_f_list, "count_min=1 Tmx, Tpx fixed, t="+str(t)+", Tsx allow change for EM", "em_p_Y_f_list_plot_count_min=1_Tmpfixed_t="+str(t)+"_50.pdf" ,50)
+    make_em_plot(p_Y_f_list,"count_min=1 Tmx, Tpx fixed, t="+str(t)+", Tsx allow change for EM", f_int[0:-4]+"_em_p_Y_f_list_plot_count_min=1_Tmpfixed_t="+str(t)+".pdf")
+    make_em_plot(p_Y_f_list, "count_min=1 Tmx, Tpx fixed, t="+str(t)+", Tsx allow change for EM", f_int[0:-4]+"_em_p_Y_f_list_plot_count_min=1_Tmpfixed_t="+str(t)+"_50.pdf" ,50)
+    with open(f_int[0:-4]+"_t="+str(t)+'_parameters.txt', 'w') as out:
+        out.write("T="+new_T_list[-1]+"\n")
+        out.write("P="+new_P_list[-1]+"\n")
     return [t, new_T_list,new_P_list, p_Y_f_list]
 
 
@@ -338,8 +341,11 @@ def run():
         #print t
         #print np.exp(new_T)
         #print new_P
-        hmm_prediction(counts_plus_hmm, "+", '1e-0'+str(i),new_T, new_P)
-        hmm_prediction(counts_minus_hmm, "-",'1e-0'+str(i),new_T, new_P)
+        if counts_minus_hmm == "-":
+            hmm_prediction(counts_plus_hmm, " ", '1e-0'+str(i),new_T, new_P)
+        else:
+            hmm_prediction(counts_plus_hmm, "+", '1e-0'+str(i),new_T, new_P)
+            hmm_prediction(counts_minus_hmm, "-",'1e-0'+str(i),new_T, new_P)
 
 
 
