@@ -1,0 +1,97 @@
+# overlape TSS with AlleleHMM regions
+
+#2079 counts_plus_hmm_regions_t1e-05_interestingHets_IGV.bed
+#58686 tss_all_plus_gm12878.bed
+
+mv tss_all_gm12878.bed tmp.bed
+cat tmp.bed |LC_ALL=C sort -k1,1V -k2,2n --parallel=30 > tss_all_gm12878.bed
+grep "+" tss_all_gm12878.bed  > tss_all_plus_gm12878.bed
+grep "-" tss_all_gm12878.bed  > tss_all_minus_gm12878.bed
+
+for s in plus minus
+do 
+bedtools intersect -wo -a tss_all_${s}_gm12878.bed -b counts_${s}_hmm_regions_t1e-05_interestingHets_IGV.bed \
+|awk 'BEGIN {OFS="\t"} substr($10,1,1)=="P" {print $1, $2, $3, $10, $5, $6}' > counts_${s}_hmm_regions_t1e-05_interestingHets_IGV_Pat.tss.bed
+bedtools intersect -wo -a tss_all_${s}_gm12878.bed -b counts_${s}_hmm_regions_t1e-05_interestingHets_IGV.bed \
+|awk 'BEGIN {OFS="\t"} substr($10,1,1)=="M" {print $1, $2, $3, $10, $5, $6}' > counts_${s}_hmm_regions_t1e-05_interestingHets_IGV_Mat.tss.bed
+bedtools intersect -wo -a tss_all_${s}_gm12878.bed -b counts_${s}_hmm_regions_t1e-05_interestingHets_IGV.bed \
+|awk 'BEGIN {OFS="\t"} {print $1, $2, $3, $10, $5, $6}' > counts_${s}_hmm_regions_t1e-05_interestingHets_IGV_tss.bed
+done
+
+
+
+
+
+
+# arethe closet tss in opposite strand usually same parent (Both M or Both P) or different parent (One M, the other P)
+# check the nearest TSS on the other strand, regardless the P or M
+bedtools closest -d -a counts_plus_hmm_regions_t1e-05_interestingHets_IGV_tss.bed -b counts_minus_hmm_regions_t1e-05_interestingHets_IGV_tss.bed > inter1.bed
+cat inter1.bed |awk '$NF != -1 {print $NF}' |LC_ALL=C sort -n |uniq -c > nearest_parentTss_count.txt
+python sum_of_counts.py nearest_parentTss_count.txt `awk 'END {print $2}' nearest_parentTss_count.txt` > nearest_parentTss_accumulate_counts.txt 
+cat inter1.bed | awk 'BEGIN{OFS="\t"} substr($4,1,1)== substr($10,1,1) {print 0}' |wc -l #1578
+cat inter1.bed | awk 'BEGIN{OFS="\t"} substr($4,1,1)!= substr($10,1,1) {print 0}' |wc -l #1103
+
+cat inter1.bed | awk 'BEGIN{OFS="\t"} substr($4,1,1)== substr($10,1,1) {print $NF}' |LC_ALL=C sort -n |uniq -c  > same_par.txt
+cat inter1.bed | awk 'BEGIN{OFS="\t"} substr($4,1,1)!= substr($10,1,1) {print $NF}' |LC_ALL=C sort -n |uniq -c  > oppo_par.txt
+ln -s  /workdir/sc2457/tools/myScript/sum_of_counts.py .
+python sum_of_counts.py same_par.txt `awk 'END {print $2}' same_par.txt` > same_par_accumulate_counts.txt 
+python sum_of_counts.py oppo_par.txt `awk 'END {print $2}' oppo_par.txt` > oppo_par_accumulate_counts.txt 
+
+# check the nearest TSS on the other strand AND have DIFFERENT parent
+bedtools closest -d -a counts_plus_hmm_regions_t1e-05_interestingHets_IGV_Pat.tss.bed -b counts_minus_hmm_regions_t1e-05_interestingHets_IGV_Mat.tss.bed > inter2
+bedtools closest -d -a counts_plus_hmm_regions_t1e-05_interestingHets_IGV_Mat.tss.bed -b counts_minus_hmm_regions_t1e-05_interestingHets_IGV_Pat.tss.bed >> inter2
+cat inter2 |awk '$NF != -1 {print $NF}' |LC_ALL=C sort -n |uniq -c > nearest_oppo_parentTss_count.txt
+python sum_of_counts.py nearest_oppo_parentTss_count.txt `awk 'END {print $2}' nearest_oppo_parentTss_count.txt` > nearest_oppo_parentTss_accumulate_counts.txt 
+
+# the nearest TSS on the other strand AND have SAME parent
+bedtools closest -d -a counts_plus_hmm_regions_t1e-05_interestingHets_IGV_Mat.tss.bed -b counts_minus_hmm_regions_t1e-05_interestingHets_IGV_Mat.tss.bed > inter3
+bedtools closest -d -a counts_plus_hmm_regions_t1e-05_interestingHets_IGV_Pat.tss.bed -b counts_minus_hmm_regions_t1e-05_interestingHets_IGV_Pat.tss.bed >> inter3
+cat inter3 |awk '$NF != -1 {print $NF}' |LC_ALL=C sort -n |uniq -c > nearest_same_parentTss_count.txt
+python sum_of_counts.py nearest_same_parentTss_count.txt `awk 'END {print $2}' nearest_same_parentTss_count.txt` > nearest_same_parentTss_accumulate_counts.txt 
+
+
+### instead of TSS, use AlleleHMM regions?
+bedtools closest -d -a counts_plus_hmm_regions_t1e-05_interestingHets_IGV.bed -b counts_minus_hmm_regions_t1e-05_interestingHets_IGV.bed > inter4
+bedtools closest -d -b counts_plus_hmm_regions_t1e-05_interestingHets_IGV.bed -a counts_minus_hmm_regions_t1e-05_interestingHets_IGV.bed >> inter4 
+cat inter4 |awk '$NF != -1 {print $NF}' |LC_ALL=C sort -n |uniq -c > nearest_otherStrand_AlleleHMM_count.txt
+f=nearest_otherStrand_AlleleHMM_count.txt
+python sum_of_counts.py $f `awk 'END {print $2}' $f` > nearest_otherStrand_AlleleHMM_accumulate_counts.txt 
+
+cat inter4 | awk 'BEGIN{OFS="\t"} substr($4,1,1)== substr($10,1,1) {print 0}' |wc -l #1264
+cat inter4 | awk 'BEGIN{OFS="\t"} substr($4,1,1)!= substr($10,1,1) {print 0}' |wc -l #958
+
+cat inter4 | awk 'BEGIN{OFS="\t"} substr($4,1,1)== substr($10,1,1) {print $NF}' |LC_ALL=C sort -n |uniq -c  > same_par.txt
+cat inter4 | awk 'BEGIN{OFS="\t"} substr($4,1,1)!= substr($10,1,1) {print $NF}' |LC_ALL=C sort -n |uniq -c  > oppo_par.txt
+python sum_of_counts.py same_par.txt `awk 'END {print $2}' same_par.txt` > same_par_accumulate_counts.txt 
+python sum_of_counts.py oppo_par.txt `awk 'END {print $2}' oppo_par.txt` > oppo_par_accumulate_counts.txt 
+
+# check the nearest AlleleHMM on the other strand AND have DIFFERENT parent
+bedtools closest -d -a <(grep P counts_plus_hmm_regions_t1e-05_interestingHets_IGV.bed) -b <(grep M counts_minus_hmm_regions_t1e-05_interestingHets_IGV.bed) > inter5 
+bedtools closest -d -a <(grep M counts_plus_hmm_regions_t1e-05_interestingHets_IGV.bed) -b <(grep P counts_minus_hmm_regions_t1e-05_interestingHets_IGV.bed) >> inter5 
+cat inter5 |awk '$NF != -1 {print $NF}' |LC_ALL=C sort -n |uniq -c > nearest_oppo_parent_AlleleHMM_count.txt
+python sum_of_counts.py nearest_oppo_parent_AlleleHMM_count.txt `awk 'END {print $2}' nearest_oppo_parent_AlleleHMM_count.txt` > nearest_oppo_parent_AlleleHMM_accumulate_counts.txt 
+
+# check the nearest AlleleHMM on the other strand AND have SAME parent
+bedtools closest -d -a <(grep M counts_plus_hmm_regions_t1e-05_interestingHets_IGV.bed) -b <(grep M counts_minus_hmm_regions_t1e-05_interestingHets_IGV.bed) > inter6 
+bedtools closest -d -a <(grep P counts_plus_hmm_regions_t1e-05_interestingHets_IGV.bed) -b <(grep P counts_minus_hmm_regions_t1e-05_interestingHets_IGV.bed) >> inter6 
+cat inter6 |awk '$NF != -1 {print $NF}' |LC_ALL=C sort -n |uniq -c > nearest_same_parent_AlleleHMM_count.txt
+python sum_of_counts.py nearest_same_parent_AlleleHMM_count.txt `awk 'END {print $2}' nearest_same_parent_AlleleHMM_count.txt` > nearest_same_parent_AlleleHMM_accumulate_counts.txt 
+
+# the nearest AlleleHMM regions on both strand
+cat counts_plus_hmm_regions_t1e-05_interestingHets_IGV.bed  counts_minus_hmm_regions_t1e-05_interestingHets_IGV.bed |LC_ALL=C sort -k1,1V -k2,2n > counts_BOTH_hmm_regions_t1e-05_interestingHets_IGV.bed
+bedtools closest -d -io -t first -a counts_BOTH_hmm_regions_t1e-05_interestingHets_IGV.bed -b counts_BOTH_hmm_regions_t1e-05_interestingHets_IGV.bed \
+| awk '{print $NF}' |LC_ALL=C sort -n |uniq -c > nearest_bothStrandAlleleHMM_count.txt
+python sum_of_counts.py nearest_bothStrandAlleleHMM_count.txt `awk 'END {print $2}' nearest_bothStrandAlleleHMM_count.txt` > nearest_bothStrandAlleleHMM_accumulate_counts.txt 
+
+bedtools closest -d -io -t first -a counts_BOTH_hmm_regions_t1e-05_interestingHets_IGV.bed -b counts_BOTH_hmm_regions_t1e-05_interestingHets_IGV.bed \
+| awk '{print $NF}' > nearest_bothStrandAlleleHMM_Rawcount.txt
+
+
+### distance between pairs of HMM regions
+use python code 
+
+
+
+###IGV
+cat counts_plus_noX_MinCount1_MaxPvalue1.txt | awk 'BEGIN{OFS="\t"; l=","} (NR>1) {print $1,$2-1,$2, $14l$19l$20, 111, "+"}' > counts_plus_noX_MinCount1_MaxPvalue1_IGV.bed
+cat counts_minus_noX_MinCount1_MaxPvalue1.txt | awk 'BEGIN{OFS="\t"; l=","} (NR>1) {print $1,$2-1,$2, $14l$19l$20, 111, "-"}' > counts_minus_noX_MinCount1_MaxPvalue1_IGV.bed
