@@ -84,12 +84,13 @@ bedtools closest -d -io -t first -a counts_BOTH_hmm_regions_t1e-05_interestingHe
 python sum_of_counts.py nearest_bothStrandAlleleHMM_count.txt `awk 'END {print $2}' nearest_bothStrandAlleleHMM_count.txt` > nearest_bothStrandAlleleHMM_accumulate_counts.txt 
 
 bedtools closest -d -io -t first -a counts_BOTH_hmm_regions_t1e-05_interestingHets_IGV.bed -b counts_BOTH_hmm_regions_t1e-05_interestingHets_IGV.bed \
-| awk '{print $NF}' > nearest_bothStrandAlleleHMM_Rawcount.txt
+| awk '{print $NF}' > nearest_bothStrandAlleleHMM_RawCount.txt
 
 
 ### distance between pairs of HMM regions
-use python code 
-
+#use python code Pairwise_distance_of_regionsinbed.py to calcualte the Pairwise_distance AND the distance to the nearest regions.
+#bedtools cannot exclude self
+use R to fit the line
 
 
 ###IGV
