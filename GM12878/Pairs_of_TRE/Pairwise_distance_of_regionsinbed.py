@@ -32,6 +32,7 @@ def bed_distance(bed1, bed2):
 
 
 dis_list=[]
+dis_list_str=[]
 for cn in xrange(1,23):
     c = "chr"+str(cn)
     bed_c=bed_regions[chrom== c]
@@ -40,62 +41,40 @@ for cn in xrange(1,23):
         for j in xrange(i+1,len(bed_c)):
             #p_M[i,j] = bed_distance(bed_c[i], bed_c[j])
             #p_M[j,i] = p_M[i,j]
-            d = bed_distance(bed_c[i], bed_c[j])/1000.0
+            d = bed_distance(bed_c[i], bed_c[j])
             #if d<100: #100Mb
             dis_list.append(d)
+            dis_list_str.append(str(d))
 
 
 dis=np.array(dis_list)
 #m_dis=np.array(dis_list)
 #p_dis=np.array(dis_list)
 
+with open(infp+"_pairwise_distance.txt", "w") as out:
+    out.write("\n".join(dis_list_str))
+
 import matplotlib.pyplot as plt
 #n, bins, patches = plt.hist(dis[(dis>= 1000) & (dis<=10000000)], 500, cumulative=False, facecolor='g', alpha=0.75)
 
-n, bins, patches = plt.hist(dis[(dis<50)], 50, cumulative=False, facecolor='g', alpha=0.75)
-plt.title('dis[(dis<50)]')
-plt.xlabel('AlleleHMM regions Pairewise distance (Kb)')
-plt.ylabel('Frequency')
-plt.savefig('50.pdf')
-plt.close() 
+#b=500
+for b in [50,500,5000]:
+    n, bins, bins = plt.hist(dis[(dis<50000)], b, cumulative=False, facecolor='g', alpha=0.75)
+    plt.title('dis[(dis<50K)]')
+    plt.xlabel('AlleleHMM regions Pairewise distance (base)')
+    plt.ylabel('Frequency')
+    plt.savefig(str(b)+'.pdf')
+    plt.close()
 
 
-n, bins, patches = plt.hist(dis[(dis<50)], 500, cumulative=False, facecolor='g', alpha=0.75)
-plt.title('dis[(dis<50)]')
-plt.xlabel('AlleleHMM regions Pairewise distance (Kb)')
-plt.ylabel('Frequency')
-plt.savefig('500.pdf')
-plt.close() 
 
-n, bins, patches = plt.hist(dis[(dis<50)], 5000, cumulative=False, facecolor='g', alpha=0.75)
-plt.title('dis[(dis<50)]')
-plt.xlabel('AlleleHMM regions Pairewise distance (Kb)')
-plt.ylabel('Frequency')
-plt.savefig('5000.pdf')
-plt.close()
-
-
-n, bins, patches = plt.hist(m_dis[(m_dis<50)], 50, cumulative=False, facecolor='blue', alpha=0.75)
-plt.title('m_dis[(m_dis<50)]')
-plt.xlabel('AlleleHMM regions Pairewise distance (Kb)')
-plt.ylabel('Frequency')
-plt.savefig('50.pdf')
-plt.close() 
-
-
-n, bins, patches = plt.hist(m_dis[(m_dis<50)], 500, cumulative=False, facecolor='blue', alpha=0.75)
-plt.title('m_dis[(m_dis<50)]')
-plt.xlabel('AlleleHMM regions Pairewise distance (Kb)')
-plt.ylabel('Frequency')
-plt.savefig('500.pdf')
-plt.close() 
-
-n, bins, patches = plt.hist(m_dis[(m_dis<50)], 5000, cumulative=False, facecolor='blue', alpha=0.75)
-plt.title('m_dis[(m_dis<50)]')
-plt.xlabel('AlleleHMM regions Pairewise distance (Kb)')
-plt.ylabel('Frequency')
-plt.savefig('5000.pdf')
-plt.close()
+for b in [50,500,5000]:
+    n, bins, patches = plt.hist(m_dis[(m_dis<50000)], b, cumulative=False, facecolor='blue', alpha=0.75)
+    plt.title('m_dis[(m_dis<50K)]')
+    plt.xlabel('AlleleHMM regions Pairewise distance (Kb)')
+    plt.ylabel('Frequency')
+    plt.savefig(str(b)+'.pdf')
+    plt.close() 
 
 
 
@@ -109,6 +88,7 @@ strand=np.loadtxt(infp, dtype=str ,delimiter='\t', usecols=[5], skiprows=0)
 #dis_list=[]
 p_M_list=[]
 smallest_d_per_row=[]
+smallest_d_per_row_str=[]
 for cn in xrange(1,23):
     c = "chr"+str(cn)
     bed_c=bed_regions[chrom== c]
@@ -118,11 +98,15 @@ for cn in xrange(1,23):
             p_M[i,j] = bed_distance(bed_c[i], bed_c[j])
             p_M[j,i] = p_M[i,j]
         smallest_d_per_row.append(min(p_M[i]))
+        smallest_d_per_row_str.append(str(min(p_M[i])))
     p_M_list.append(p_M)
             #d = bed_distance(bed_c[i], bed_c[j])
             #if d<500000: #500K
             #    dis_list.append(d)
 
+
+with open(infp+"_distanceToNearestRegion.txt", "w") as out:
+    out.write("\n".join(smallest_d_per_row_str))
 
 #make plot for EACH chromosome
 i=1
@@ -154,26 +138,14 @@ plt.close()
 
 # smallest distance
 smallest_d_per_row = np.array(smallest_d_per_row)
-n, bins, patches = plt.hist(smallest_d_per_row[(smallest_d_per_row<50000)], 50, cumulative=False, facecolor='g', alpha=0.75)
-plt.title("smallest_d_per_row<50000")
-plt.xlabel('Distance to nearesr AlleleHMM regions(Kb)')
-plt.ylabel('Frequency')
-plt.savefig('50.pdf')
-plt.close() 
+for b in [50,500,5000]:
+    n, bins, patches = plt.hist(smallest_d_per_row[(smallest_d_per_row<50000)], b, cumulative=False, facecolor='g', alpha=0.75)
+    plt.title("smallest_d_per_row<50Kb")
+    plt.xlabel('Distance to nearesr AlleleHMM regions(base)')
+    plt.ylabel('Frequency')
+    plt.savefig(str(b)+'.pdf')
+    plt.close() 
 
-n, bins, patches = plt.hist(smallest_d_per_row[(smallest_d_per_row<50000)], 500, cumulative=False, facecolor='g', alpha=0.75)
-plt.title('smallest_d_per_row[(smallest_d_per_row<50000)]')
-plt.xlabel('AlleleHMM regions Pairewise distance (Kb)')
-plt.ylabel('Frequency')
-plt.savefig('500.pdf')
-plt.close() 
-
-n, bins, patches = plt.hist(smallest_d_per_row[(smallest_d_per_row<50000)], 5000, cumulative=False, facecolor='g', alpha=0.75)
-plt.title('smallest_d_per_row[(smallest_d_per_row<50000)]')
-plt.xlabel('AlleleHMM regions Pairewise distance (Kb)')
-plt.ylabel('Frequency')
-plt.savefig('5000.pdf')
-plt.close()
 
 
 
