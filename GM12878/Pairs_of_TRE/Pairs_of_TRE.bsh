@@ -20,9 +20,6 @@ done
 
 
 
-
-
-
 # arethe closet tss in opposite strand usually same parent (Both M or Both P) or different parent (One M, the other P)
 # check the nearest TSS on the other strand, regardless the P or M
 bedtools closest -d -a counts_plus_hmm_regions_t1e-05_interestingHets_IGV_tss.bed -b counts_minus_hmm_regions_t1e-05_interestingHets_IGV_tss.bed > inter1.bed
@@ -30,8 +27,7 @@ cat inter1.bed |awk '$NF != -1 {print $NF}' |LC_ALL=C sort -n |uniq -c > nearest
 python sum_of_counts.py nearest_parentTss_count.txt `awk 'END {print $2}' nearest_parentTss_count.txt` > nearest_parentTss_accumulate_counts.txt 
 cat inter1.bed | awk 'BEGIN{OFS="\t"} substr($4,1,1)== substr($10,1,1) {print 0}' |wc -l #1578
 cat inter1.bed | awk 'BEGIN{OFS="\t"} substr($4,1,1)!= substr($10,1,1) {print 0}' |wc -l #1103
-
-cat inter1.bed | awk 'BEGIN{OFS="\t"} substr($4,1,1)== substr($10,1,1) {print $NF}' |LC_ALL=C sort -n |uniq -c  > same_par.txt
+t inter1.bed | awk 'BEGIN{OFS="\t"} substr($4,1,1)== substr($10,1,1) {print $NF}' |LC_ALL=C sort -n |uniq -c  > same_par.txt
 cat inter1.bed | awk 'BEGIN{OFS="\t"} substr($4,1,1)!= substr($10,1,1) {print $NF}' |LC_ALL=C sort -n |uniq -c  > oppo_par.txt
 ln -s  /workdir/sc2457/tools/myScript/sum_of_counts.py .
 python sum_of_counts.py same_par.txt `awk 'END {print $2}' same_par.txt` > same_par_accumulate_counts.txt 
@@ -87,12 +83,162 @@ bedtools closest -d -io -t first -a counts_BOTH_hmm_regions_t1e-05_interestingHe
 | awk '{print $NF}' > nearest_bothStrandAlleleHMM_RawCount.txt
 
 
-### distance between pairs of HMM regions
+###IGV
+cat counts_plus_noX_MinCount1_MaxPvalue1.txt | awk 'BEGIN{OFS="\t"; l=","} (NR>1) {print $1,$2-1,$2, $14l$19l$20, 111, "+"}' > counts_plus_noX_MinCount1_MaxPvalue1_IGV.bed
+cat counts_minus_noX_MinCount1_MaxPvalue1.txt | awk 'BEGIN{OFS="\t"; l=","} (NR>1) {print $1,$2-1,$2, $14l$19l$20, 111, "-"}' > counts_minus_noX_MinCount1_MaxPvalue1_IGV.bed
+
+
+### Ignore above, use the follwoing instead
+cat counts_plus_hmm_regions_t1e-05_interestingHets_IGV.bed  counts_minus_hmm_regions_t1e-05_interestingHets_IGV.bed |LC_ALL=C sort -k1,1V -k2,2n > counts_both_hmm_regions_t1e-05_interestingHets_IGV.bed
+
+### distance between pairs of HMM regions ### 
 #use python code Pairwise_distance_of_regionsinbed.py to calcualte the Pairwise_distance AND the distance to the nearest regions.
 #bedtools cannot exclude self
 use R to fit the line
 
+#4173 counts_both_hmm_regions_t1e-05_interestingHets_IGV.bed
+D=20000
+bedtools cluster -i counts_both_hmm_regions_t1e-05_interestingHets_IGV.bed -d $D > counts_both_hmm_regions_t1e-05_interestingHets_IGV_clusterBy${D}bp.bed
+# 2676 cluster
+cat counts_both_hmm_regions_t1e-05_interestingHets_IGV_clusterBy${D}bp.bed |cut -f 7 |uniq -c |awk '{print $1}' |sort -n |uniq -c
+   1998 1
+    409 2
+    143 3
+     58 4
+     32 5
+      9 6
+      9 7
+      4 8
+      2 9
+      3 10
+      1 11
+      1 12
+      1 13 chr6    57375920-57512147
+      1 17 chr9    67334229-68739721
+      2 19   899, 907 #chr6    31234380-31325822, chr6    29817937-29944651
+      1 24  #chr6    257185-412741
+      1 27  #chr6    33032429-33059796
+      1 195 #chr6    32413458-32636434
 
-###IGV
-cat counts_plus_noX_MinCount1_MaxPvalue1.txt | awk 'BEGIN{OFS="\t"; l=","} (NR>1) {print $1,$2-1,$2, $14l$19l$20, 111, "+"}' > counts_plus_noX_MinCount1_MaxPvalue1_IGV.bed
-cat counts_minus_noX_MinCount1_MaxPvalue1.txt | awk 'BEGIN{OFS="\t"; l=","} (NR>1) {print $1,$2-1,$2, $14l$19l$20, 111, "-"}' > counts_minus_noX_MinCount1_MaxPvalue1_IGV.bed
+# identify cluster with two regions
+cat counts_both_hmm_regions_t1e-05_interestingHets_IGV_clusterBy${D}bp.bed |cut -f 7 |uniq -c |awk '$1==2 {print $2}' > 2_hmm_cluster_list.txt
+
+#D=40000
+#2409 cluster
+   // 1658 1
+   //  433 2
+   //  156 3
+   //   70 4
+   //   34 5
+   //   15 6
+   //   15 7
+   //    9 8
+   //    3 9
+   //    4 10
+   //    2 11
+   //    1 12
+   //    1 15
+   //    1 16
+   //    1 17
+   //    1 18
+   //    2 19
+   //    1 28
+   //    1 34
+   //    1 195  #chr6    32413458-32636434
+
+
+
+D=60000
+bedtools cluster -i counts_both_hmm_regions_t1e-05_interestingHets_IGV.bed -d $D > counts_both_hmm_regions_t1e-05_interestingHets_IGV_clusterBy${D}bp.bed
+#  2233 cluster
+cat counts_both_hmm_regions_t1e-05_interestingHets_IGV_clusterBy${D}bp.bed |cut -f 7 |uniq -c |awk '{print $1}' |sort -n |uniq -c
+
+   1447 1
+    422 2
+    175 3
+     78 4
+     44 5
+     16 6
+     16 7
+      9 8
+      5 9
+      6 10
+      3 11
+      1 12
+      1 13
+      3 16
+      1 17
+      1 18
+      1 19
+      1 21
+      1 28
+      1 34
+      1 195
+
+
+D=20000
+bedtools cluster -i tss_all_gm12878.bed -d $D > tss_all_gm12878_clusterBy${D}bp.bed
+# 15214 cluster
+cat tss_all_gm12878_clusterBy${D}bp.bed|cut -f 7 |uniq -c |awk '{print $1}' |sort -n |uniq -c
+
+#tss in the HMM clusterRegions
+bedtools intersect -s -a tss_all_gm12878.bed -b counts_both_hmm_regions_t1e-05_interestingHets_IGV_clusterBy20000bp.bed -wb |awk '{OFS="\t"}{print $1, $2, $3, $10, $11, $12, $13}' >counts_both_hmm_regions_t1e-05_interestingHets_IGV_clusterBy20000bp_tss_all.bed
+cat counts_both_hmm_regions_t1e-05_interestingHets_IGV_clusterBy20000bp_tss_all.bed| cut -f 7 |uniq -c |awk '{print $1}'> counts_both_hmm_regions_t1e-05_interestingHets_IGV_clusterBy20000bp_tssPerClusterCount.txt
+cat counts_both_hmm_regions_t1e-05_interestingHets_IGV_clusterBy20000bp_tss_all.bed| cut -f 7 |uniq -c |awk '{print $1}' |sort -n |uniq -c
+
+
+
+
+### mouse F1 B6 X CAST
+### Ignore above, use the follwoing instead
+cat counts_plus_hmm_regions_t1e-05_interestingHets_IGV.bed  counts_minus_hmm_regions_t1e-05_interestingHets_IGV.bed |LC_ALL=C sort -k1,1V -k2,2n > counts_both_hmm_regions_t1e-05_interestingHets_IGV.bed
+
+### distance between pairs of HMM regions ### 
+#use python code Pairwise_distance_of_regionsinbed.py to calcualte the Pairwise_distance AND the distance to the nearest regions.
+#bedtools cannot exclude self
+use R to fit the line
+
+#wc -l counts_both_hmm_regions_t1e-05_interestingHets_IGV.bed
+#7687 counts_both_hmm_regions_t1e-05_interestingHets_IGV.bed
+D=10000
+bedtools cluster -i counts_both_hmm_regions_t1e-05_interestingHets_IGV.bed -d $D > counts_both_hmm_regions_t1e-05_interestingHets_IGV_clusterBy${D}bp.bed
+# 4893 cluster
+cat counts_both_hmm_regions_t1e-05_interestingHets_IGV_clusterBy${D}bp.bed |cut -f 7 |uniq -c |awk '{print $1}' |sort -n |uniq -c
+   3190 1
+   1095 2
+    332 3
+    166 4
+     61 5
+     27 6
+     12 7
+      5 8
+      2 9 chr13:101461351-102722291,  chr12:106278572-106829133
+      1 10 chr18:47484998-49735503
+      1 11 chr14:110634309-112776656
+      1 15 chr14:115457441-116809004
+
+
+
+
+
+D=20000
+#4526 cluster
+   2734 1
+   1079 2
+    375 3
+    170 4
+     89 5
+     42 6
+     23 7
+      7 8
+      3 9
+      1 10
+      2 11  
+      1 15  
+
+bedtools intersect -a <(zcat out.dREG.peak.full.bed.gz) -b counts_plus_hmm_regions_t1e-05_interestingHets_IGV.bed -wb |awk '{OFS="\t"}{print $1, $2, $3, $13, $14, $15}' > counts_plus_hmm_regions_t1e-05_interestingHets_dReg.bed
+bedtools intersect -a <(zcat out.dREG.peak.full.bed.gz) -b counts_minus_hmm_regions_t1e-05_interestingHets_IGV.bed -wb |awk '{OFS="\t"}{print $1, $2, $3, $13, $14, $15}' > counts_minus_hmm_regions_t1e-05_interestingHets_dReg.bed
+
+bedtools intersect -a <(zcat out.dREG.peak.full.bed.gz) -b counts_both_hmm_regions_t1e-05_interestingHets_IGV_clusterBy10000bp.bed -wb |awk '{OFS="\t"}{print $1, $2, $3, $13, $14, $15, $16}' >counts_both_hmm_regions_t1e-05_interestingHets_IGV_clusterBy10000bp_dReg.bed
+cat counts_both_hmm_regions_t1e-05_interestingHets_IGV_clusterBy10000bp_dReg.bed| cut -f 7 |uniq -c |awk '{print $1}' |sort -n |uniq -c
+
