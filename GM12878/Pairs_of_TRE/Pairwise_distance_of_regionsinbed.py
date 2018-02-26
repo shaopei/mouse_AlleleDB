@@ -54,12 +54,14 @@ dis=np.array(dis_list)
 with open(infp+"_pairwise_distance.txt", "w") as out:
     out.write("\n".join(dis_list_str))
 
+#import matplotlib as mpl
+#mpl.use('Agg')
 import matplotlib.pyplot as plt
 #n, bins, patches = plt.hist(dis[(dis>= 1000) & (dis<=10000000)], 500, cumulative=False, facecolor='g', alpha=0.75)
 
 #b=500
 for b in [50,500,5000]:
-    n, bins, bins = plt.hist(dis[(dis<50000)], b, cumulative=False, facecolor='g', alpha=0.75)
+    n, bins, patches = plt.hist(dis[(dis<50000)], b, cumulative=False, facecolor='g', alpha=0.75)
     plt.title('dis[(dis<50K)]')
     plt.xlabel('AlleleHMM regions Pairewise distance (base)')
     plt.ylabel('Frequency')
@@ -108,12 +110,25 @@ for cn in xrange(1,23):
 with open(infp+"_distanceToNearestRegion.txt", "w") as out:
     out.write("\n".join(smallest_d_per_row_str))
 
+# smallest distance
+smallest_d_per_row = np.array(smallest_d_per_row)
+for b in [50,500,5000]:
+    n, bins, patches = plt.hist(smallest_d_per_row[(smallest_d_per_row<50000)], b, cumulative=False, facecolor='g', alpha=0.75)
+    plt.title("smallest_d_per_row<50Kb")
+    plt.xlabel('Distance to nearesr AlleleHMM regions(base)')
+    plt.ylabel('Frequency')
+    plt.savefig(str(b)+'.pdf')
+    plt.close() 
+
+
+
 #make plot for EACH chromosome
+Uplimit=20000
 i=1
 for p_M in p_M_list:
     print p_M.shape
-    p_M[p_M > 5000000] = 5000000
-    plt.imshow(p_M)#, cmap='hot', interpolation='nearest')
+    p_M[p_M > Uplimit] = Uplimit
+    plt.imshow(p_M, cmap='hot')#, interpolation='nearest')
     plt.colorbar()
     plt.title('chr'+str(i))
     plt.savefig('chr'+str(i)+".pdf")
@@ -136,15 +151,6 @@ plt.colorbar()
 plt.savefig("chrAll.pdf")
 plt.close()
 
-# smallest distance
-smallest_d_per_row = np.array(smallest_d_per_row)
-for b in [50,500,5000]:
-    n, bins, patches = plt.hist(smallest_d_per_row[(smallest_d_per_row<50000)], b, cumulative=False, facecolor='g', alpha=0.75)
-    plt.title("smallest_d_per_row<50Kb")
-    plt.xlabel('Distance to nearesr AlleleHMM regions(base)')
-    plt.ylabel('Frequency')
-    plt.savefig(str(b)+'.pdf')
-    plt.close() 
 
 
 
