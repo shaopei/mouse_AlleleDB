@@ -10,6 +10,8 @@ hist(f2$V1,col=mycol1
      #, xlab="HMM blocks in the cluster"
      #, add=T
      , xlim=c(0,50)
+     ,xlab="Number of HMM blocks or TSSs in each cluster"
+     ,main=""
 )
 lamda = with(f2, 1/mean(V1))
 x=seq(0,200,1)
@@ -17,7 +19,7 @@ lines(x, lamda*exp(-lamda*x), col="dark orange",lwd=1.5)
 #lines(density(f2$V1), col="light blue") 
 legend("topright", 
        legend = paste("Exponential pdf lamda = ", format(lamda, digits=2, nsmall=2),sep=""),
-       lty=1, lwd=1.5, col="orange", bty = "n")
+       lty=c(0,1,0,1), lwd=1.5, col="orange", bty = "n")
 
 f3p="counts_both_hmm_regions_t1e-05_interestingHets_IGV_clusterBy20000bp_tssPerClusterCount.txt" 
 f3p="counts_both_hmm_regions_t1e-05_interestingHets_IGV_clusterBy10000bp_dRegPerClusterCount.txt"
@@ -36,9 +38,14 @@ legend("topright",
        lty=1, lwd=1.5, col="red", bty = "n")
 
 legend("topright", 
-       legend = c(paste("AlleleHMM Exponential pdf lamda = ", format(lamda, digits=2, nsmall=2),sep="")
-                  ,paste("TSS Exponential pdf lamda = ", format(lamda2, digits=2, nsmall=2),sep="")),
-       lty=1, lwd=1.5, col=c("dark orange","red"), bty = "n")
+       legend = c("AlleleHMM",paste("AlleleHMM Exponential pdf lamda = ", format(lamda, digits=2, nsmall=2),sep="")
+                  ,"TSS",paste("TSS Exponential pdf lamda = ", format(lamda2, digits=2, nsmall=2),sep="")),
+       pch=c(15,NA,15,NA),
+       cex=0.8, 
+       lty=c(0,1,0,1),
+       #bty="n",
+       lwd=1.5, 
+       col=c(mycol1,"dark orange",mycol2, "red"), bty = "n")
 
 
 ###color transparant
