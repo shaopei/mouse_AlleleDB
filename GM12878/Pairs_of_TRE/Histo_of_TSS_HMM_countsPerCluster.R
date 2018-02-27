@@ -19,7 +19,7 @@ lines(x, lamda*exp(-lamda*x), col="dark orange",lwd=1.5)
 #lines(density(f2$V1), col="light blue") 
 legend("topright", 
        legend = paste("Exponential pdf lamda = ", format(lamda, digits=2, nsmall=2),sep=""),
-       lty=c(0,1,0,1), lwd=1.5, col="orange", bty = "n")
+       lty=1, lwd=1.5, col="orange", bty = "n")
 
 f3p="counts_both_hmm_regions_t1e-05_interestingHets_IGV_clusterBy20000bp_tssPerClusterCount.txt" 
 f3p="counts_both_hmm_regions_t1e-05_interestingHets_IGV_clusterBy10000bp_dRegPerClusterCount.txt"
