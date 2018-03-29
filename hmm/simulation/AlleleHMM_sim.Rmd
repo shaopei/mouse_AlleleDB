@@ -25,6 +25,7 @@ dim(f1)
 hist(f1$total_reads_count[f1$total_reads_count<100], main="CAST x B6")
 
 ```
+
 Simulation of one HMM block
 ```{r}
 #Simulation of one HMM block
@@ -42,12 +43,15 @@ sim_HMM_block <- function(BlockLength, ExpressionLevel, MatBinoP){
 #b1=sim_HMM_block(10,5, 0.2)
 #b1
 ```
+
 Human
 Average gene size in human is 10-15 Kb. If every SNP per Kb, then 10-15 SNPs per gene.
 
 Mouse
 http://www.informatics.jax.org/silver/frames/frame5-1.shtml
 Nevertheless, a survey spanning all of the hundreds of mammalian genes characterized to date would seem to suggest that mdx is an extreme example, with most genes falling into the range of 10-80 kb, with an median size in the range of 20 kb. If every SNPs 160bp, then 125 SNPs per gene.
+
+Simulation of 3 HMM blocks (Sym-Mat-Sym)
 ```{r}
 # Simulation of 3 HMM blocks (Sym-Mat-Sym)
 numberOfBlock <- 3
@@ -94,7 +98,6 @@ write.table(blockList, file = "similated_Counts.txt", quote = F, sep = "\t")
 blockList
 ```
 
-
 naive model:treating SNPs independently
 ```{r}
 # naive model:treating SNPs independently.
@@ -114,6 +117,7 @@ blockList$AlleleDB_p_value_sig <- blockList$AlleleDB_p_value < p_threshold
 blockList
 ```
 
+T from B6XCast F1 LZ data
 69
 p_Y_l  -188.887959957
 p_Y_l  -191.107214928
@@ -209,10 +213,23 @@ def viterbi (p, T, x, n):
 # seperate the autosome
 # seperate plus and minus strand
 #def hmm_prediction(f_v, strand, t,new_T, new_P):
-if len(argv)==1:
-    f_v = "similated_Counts.txt"
-else:
-    f_v=argv[1]
+import sys, getopt
+f_v = "similated_Counts.txt"
+t = 1e-05
+try:
+   opts, args = getopt.getopt(sys.argv[1:],"i:t:")
+except getopt.GetoptError:
+   print 'HMM_prediction.py -i <inputfile> -t <tuning parameter t>'
+   sys.exit(2)
+
+for opt, arg in opts:
+    if opt in ("-i"):
+        f_v = arg
+    elif opt in ("-t"):
+        t = float(arg)
+print 'Input file:\t', f_v
+print 't:\t', t
+
 data_v = np.loadtxt(f_v, dtype=str ,delimiter='\t', usecols=range(0,6), skiprows=1)
 mat_v  = np.loadtxt(f_v, dtype=int ,delimiter='\t', usecols=[5], skiprows=1)
 total_v = np.loadtxt(f_v, dtype=int ,delimiter='\t', usecols=[4], skiprows=1)
@@ -240,7 +257,7 @@ with open(f_v[0:-4]+'_AlleleHMM.txt', 'w') as out:
 
 ```
 
-
+combine the reads in the same HMM blocks and perform bionomial test
 ```{r}
 # combine the reads in the same HMM blocks and perform bionomial test
 hmm_result=read.table("similated_Counts_AlleleHMM.txt",header=T)
@@ -284,7 +301,7 @@ blockList$HMM_accum_mat_reads<- hmm_result$accum_mat_reads
 blockList$HMM_state<- hmm_result$hmm_state
 ```
 
-Sensitivity  test (remove later?)
+Sensitivity  test 
 ```{r}
 # MatBionP<0.3 or >0.7 and significant
 dim(blockList)
@@ -298,7 +315,7 @@ print(paste("Sensitivity for AlleleHMM is",sum(blockList$MatBinoP<0.3 | blockLis
 
 ```
 
-wrap codes into a function to test sensitivity 
+wrap codes into a function to test sensitivity  (Use this one)
 ```{r}
 ## wrap into a function to test sensitivity 
 
@@ -525,6 +542,141 @@ legend("bottomleft",
 #http://127.0.0.1:40576/chunk_output/B1844C7ED108D0A9/3235B715/cg1kuvtz4y6np/000081.png
 ```
 
+Expression level and sensitivity
+```{r}
+#Expression level and sensitivity
+
+numberOfBlock <- 3
+#legnth of each block
+l <- c(10,100,10)
+# expression level of each block
+e <- c(10,10,10)
+mat_p <- c(0.5,0.9,0.5)
+
+iteration=1000
+e_list=c()
+e_SNP_sen_list=c()
+e_HMM_sen_list=c()
+e_SNP_sen_se_list=c()
+e_HMM_sen_se_list=c()
+for (e_2 in seq(1,50,1)){
+  e_list = c(e_list, e_2) 
+  e=c(10, e_2, 10)
+  #print(mat_p)
+  aveS = Sensitivity_iter(iteration,l, e, mat_p)
+  e_SNP_sen_list=c(e_SNP_sen_list, aveS[1])
+  e_HMM_sen_list=c(e_HMM_sen_list, aveS[2])
+  e_SNP_sen_se_list=c(e_SNP_sen_se_list, aveS[3])
+  e_HMM_sen_se_list=c(e_HMM_sen_se_list, aveS[4])
+}
+
+e1=data.frame(e_list,e_SNP_sen_list,e_SNP_sen_se_list)
+names(e1)=c("readCount","senMean", "senSE")
+e1$method="SNP independantly"
+e2=data.frame(e_list,e_HMM_sen_list, e_HMM_sen_se_list)
+names(e2)=c("readCount","senMean", "senSE")
+e2$method="Allele HMM"
+e=rbind.data.frame(e1,e2)
+#View(e)
+write.table(e, file = "exp_and_sensitivity.txt", quote = F, sep = "\t",row.names = F)
+
+
+#View(e)
+library(ggplot2)
+# Standard error of the mean
+#pd <- position_dodge(0)
+pdf("exp_and_sensitivity.pdf")
+ggplot(e, aes(x=readCount, y=senMean, colour=method)) + 
+    geom_errorbar(aes(ymin=senMean-senSE, ymax=senMean+senSE), width=.01) +
+    geom_line() +
+    geom_point() #+ 
+    #theme_bw()
+dev.off()
+
+
+
+plot(e_list, e_HMM_sen_list, 
+     ylim = c(min(min(e_HMM_sen_list),min(e_SNP_sen_list)), 1), lwd=2,
+     ylab="sensitivity", xlab="expression level (mapped reads per SNP)", 
+     type="l", col="dark orange")
+lines(e_list, e_SNP_sen_list, lwd=2, col="blue")  
+legend("bottomright", 
+       legend = c("Allele HMM", "SNP independantly"),
+       #pch=15,
+       cex=1, 
+       lty=1, lwd=2,
+       col=c("dark orange","blue"), bty = "n")
+
+```
+Block Length and sensitivity
+```{r}
+#Block Length and sensitivity
+
+numberOfBlock <- 3
+#legnth of each block
+l <- c(10,100,10)
+# expression level of each block
+e <- c(10,10,10)
+mat_p <- c(0.5,0.9,0.5)
+
+iteration=1000
+l_list=c()
+l_SNP_sen_list=c()
+l_HMM_sen_list=c()
+l_SNP_sen_se_list=c()
+l_HMM_sen_se_list=c()
+for (l_2 in seq(1,50,1)){
+  l_list = c(l_list, l_2) 
+  l=c(10, l_2, 10)
+  #print(mat_p)
+  aveS = Sensitivity_iter(iteration,l, e, mat_p)
+  l_SNP_sen_list=c(l_SNP_sen_list, aveS[1])
+  l_HMM_sen_list=c(l_HMM_sen_list, aveS[2])
+  l_SNP_sen_se_list=c(l_SNP_sen_se_list, aveS[3])
+  l_HMM_sen_se_list=c(l_HMM_sen_se_list, aveS[4])
+}
+
+l1=data.frame(l_list,l_SNP_sen_list,l_SNP_sen_se_list)
+names(l1)=c("length","senMean", "senSE")
+l1$method="SNP independantly"
+l2=data.frame(l_list,l_HMM_sen_list, l_HMM_sen_se_list)
+names(l2)=c("length","senMean", "senSE")
+l2$method="Allele HMM"
+l=rbind.data.frame(l1,l2)
+#View(e)
+write.table(l, file = "length_and_sensitivity.txt", quote = F, sep = "\t",row.names = F)
+
+l = read.table("length_and_sensitivity_iter1000.txt", sep = "\t",header = T)
+#l=l[l$method=="SNP independantly",]
+
+
+#View(l)
+library(ggplot2)
+# Standard error of the mean
+#pd <- position_dodge(0)
+pdf("length_and_sensitivity.pdf")
+ggplot(l, aes(x=length, y=senMean, colour=method)) + 
+    geom_errorbar(aes(ymin=senMean-senSE, ymax=senMean+senSE), width=.5) +
+    geom_line() +
+    geom_point() #+ 
+    #theme_bw()
+dev.off()
+
+
+plot(l_list, l_HMM_sen_list, 
+     ylim = c(min(min(l_HMM_sen_list),min(l_SNP_sen_list)), 1), lwd=2,
+     ylab="sensitivity", xlab="Gene length", 
+     type="l", col="dark orange")
+lines(l_list, l_SNP_sen_list, lwd=2, col="blue")  
+legend("bottomright", 
+       legend = c("Allele HMM", "SNP independantly"),
+       #pch=15,
+       cex=1, 
+       lty=1, lwd=2,
+       col=c("dark orange","blue"), bty = "n")
+
+```
+
 test multi-threads with MatP
 ```{r}
 ## test multi-threads with MatP
@@ -640,74 +792,6 @@ dev.off()
 
 ```
 
-
-Expression level and sensitivity
-```{r}
-#Expression level and sensitivity
-
-numberOfBlock <- 3
-#legnth of each block
-l <- c(10,100,10)
-# expression level of each block
-e <- c(10,10,10)
-mat_p <- c(0.5,0.9,0.5)
-
-iteration=1000
-e_list=c()
-e_SNP_sen_list=c()
-e_HMM_sen_list=c()
-e_SNP_sen_se_list=c()
-e_HMM_sen_se_list=c()
-for (e_2 in seq(1,50,1)){
-  e_list = c(e_list, e_2) 
-  e=c(10, e_2, 10)
-  #print(mat_p)
-  aveS = Sensitivity_iter(iteration,l, e, mat_p)
-  e_SNP_sen_list=c(e_SNP_sen_list, aveS[1])
-  e_HMM_sen_list=c(e_HMM_sen_list, aveS[2])
-  e_SNP_sen_se_list=c(e_SNP_sen_se_list, aveS[3])
-  e_HMM_sen_se_list=c(e_HMM_sen_se_list, aveS[4])
-}
-
-e1=data.frame(e_list,e_SNP_sen_list,e_SNP_sen_se_list)
-names(e1)=c("readCount","senMean", "senSE")
-e1$method="SNP independantly"
-e2=data.frame(e_list,e_HMM_sen_list, e_HMM_sen_se_list)
-names(e2)=c("readCount","senMean", "senSE")
-e2$method="Allele HMM"
-e=rbind.data.frame(e1,e2)
-#View(e)
-write.table(e, file = "exp_and_sensitivity.txt", quote = F, sep = "\t",row.names = F)
-
-
-#View(e)
-library(ggplot2)
-# Standard error of the mean
-#pd <- position_dodge(0)
-pdf("exp_and_sensitivity.pdf")
-ggplot(e, aes(x=readCount, y=senMean, colour=method)) + 
-    geom_errorbar(aes(ymin=senMean-senSE, ymax=senMean+senSE), width=.01) +
-    geom_line() +
-    geom_point() #+ 
-    #theme_bw()
-dev.off()
-
-
-
-plot(e_list, e_HMM_sen_list, 
-     ylim = c(min(min(e_HMM_sen_list),min(e_SNP_sen_list)), 1), lwd=2,
-     ylab="sensitivity", xlab="expression level (mapped reads per SNP)", 
-     type="l", col="dark orange")
-lines(e_list, e_SNP_sen_list, lwd=2, col="blue")  
-legend("bottomright", 
-       legend = c("Allele HMM", "SNP independantly"),
-       #pch=15,
-       cex=1, 
-       lty=1, lwd=2,
-       col=c("dark orange","blue"), bty = "n")
-
-```
-
 test multi-threads with block length
 ```{r}
 ## test multi-threads with block length
@@ -727,74 +811,6 @@ l_test <- function(l_2, iteration){
 l_test_out=mclapply(seq(1,20,1),FUN=function(idx){l_test(idx,3)}, mc.cores = 3)
 ```
 
-Block Length and sensitivity
-```{r}
-#Block Length and sensitivity
-
-numberOfBlock <- 3
-#legnth of each block
-l <- c(10,100,10)
-# expression level of each block
-e <- c(10,10,10)
-mat_p <- c(0.5,0.9,0.5)
-
-iteration=1000
-l_list=c()
-l_SNP_sen_list=c()
-l_HMM_sen_list=c()
-l_SNP_sen_se_list=c()
-l_HMM_sen_se_list=c()
-for (l_2 in seq(1,50,1)){
-  l_list = c(l_list, l_2) 
-  l=c(10, l_2, 10)
-  #print(mat_p)
-  aveS = Sensitivity_iter(iteration,l, e, mat_p)
-  l_SNP_sen_list=c(l_SNP_sen_list, aveS[1])
-  l_HMM_sen_list=c(l_HMM_sen_list, aveS[2])
-  l_SNP_sen_se_list=c(l_SNP_sen_se_list, aveS[3])
-  l_HMM_sen_se_list=c(l_HMM_sen_se_list, aveS[4])
-}
-
-l1=data.frame(l_list,l_SNP_sen_list,l_SNP_sen_se_list)
-names(l1)=c("length","senMean", "senSE")
-l1$method="SNP independantly"
-l2=data.frame(l_list,l_HMM_sen_list, l_HMM_sen_se_list)
-names(l2)=c("length","senMean", "senSE")
-l2$method="Allele HMM"
-l=rbind.data.frame(l1,l2)
-#View(e)
-write.table(l, file = "length_and_sensitivity.txt", quote = F, sep = "\t",row.names = F)
-
-l = read.table("length_and_sensitivity_iter1000.txt", sep = "\t",header = T)
-#l=l[l$method=="SNP independantly",]
-
-
-#View(l)
-library(ggplot2)
-# Standard error of the mean
-#pd <- position_dodge(0)
-pdf("length_and_sensitivity.pdf")
-ggplot(l, aes(x=length, y=senMean, colour=method)) + 
-    geom_errorbar(aes(ymin=senMean-senSE, ymax=senMean+senSE), width=.5) +
-    geom_line() +
-    geom_point() #+ 
-    #theme_bw()
-dev.off()
-
-
-plot(l_list, l_HMM_sen_list, 
-     ylim = c(min(min(l_HMM_sen_list),min(l_SNP_sen_list)), 1), lwd=2,
-     ylab="sensitivity", xlab="Gene length", 
-     type="l", col="dark orange")
-lines(l_list, l_SNP_sen_list, lwd=2, col="blue")  
-legend("bottomright", 
-       legend = c("Allele HMM", "SNP independantly"),
-       #pch=15,
-       cex=1, 
-       lty=1, lwd=2,
-       col=c("dark orange","blue"), bty = "n")
-
-```
 
 
 specificity of SSS block
@@ -1020,6 +1036,442 @@ m=read.table("exp_and_sensitivity_iter1000.txt", header=T,sep = "\t")
   mplot + scale_color_manual(values=c("red", "blue"))
 ```
 
+Use Beta-Binomial, instead of Binomial
+
+Mu = shape1 / (shape1+shape2)
+Rho = 1/(1+shape1+shape2)
+Binomial Rho=0, shape1 and shape2 --> inf
+
+```{r}
+#From Allele_seq_analysis_20170613.R
+#GRO-seq data of GM12878
+s1_all = 1.571751 
+s2_all = 1.579117
+Mu_all=s1_all/(s1_all+s2_all) #0.4988311
+Rho_all=1/(1+s1_all+s2_all) # 0.2409135
+s1_Asym = 0.3774592 
+s2_Asym = 0.3816091
+Rho_Asym=1/(1+s1_Asym+s2_Asym) #0.5684828
+s1_Sym = 28.51298 
+s2_Sym = 28.54951
+Rho_Sym =1/(1+s1_Sym+s2_Sym) #0.01722282
+```
+
+using Beta-Binomial, instead of Binomial
+wrap into a function to test sensitivity 
+```{r}
+## wrap into a function to test sensitivity 
+#Simulation of one HMM block using Beta-Binomial, instead of Binomial
+
+#BlockLength=20
+#ExpressionLevel=3
+#MatBinoP=0.1
+#rbetabinom(n, size, m, s)
+#rbinom(n, size, prob)
+library(VGAM)
+sim_HMM_block_betaBino <- function(BlockLength, ExpressionLevel, MatBinoP, OD){
+  total_reads=rpois(BlockLength, ExpressionLevel)
+  mat_reads=rbetabinom(BlockLength, total_reads, MatBinoP, OD)
+  SimState = rep(ifelse(MatBinoP<0.49, "P", ifelse(MatBinoP>0.51,"M", "S")),BlockLength)
+  MatP= rep(round(MatBinoP, digits = 3),BlockLength)
+  Rho= rep(round(OD, digits = 3),BlockLength)
+  block=data.frame(total_reads, mat_reads,SimState,MatBinoP=MatP,Rho)
+  return(block)
+}
+
+
+#b1=sim_HMM_block_betaBino(10,5, 0.9, 0.01)
+#b1
+
+
+numberOfBlock <- 3
+#legnth of each block
+l <- c(10,100,10)
+# expression level of each block
+e <- c(10,10,10)
+mat_p <- c(0.5,0.9,0.5)
+od <- c(0.01, 0, 0.01)
+
+Sensitivity_betaBino<- function(l, e, mat_p, od){
+  # Simulation of 3 HMM blocks (Sym-Mat-Sym)
+  i=1
+  blockList=data.frame(sim_HMM_block_betaBino(l[i],e[i], mat_p[i], od[i]), blockID=i)
+  for (i in 2:numberOfBlock){
+    blockList= rbind.data.frame(blockList, cbind(sim_HMM_block_betaBino(l[i],e[i], mat_p[i], od[i]),blockID=i))
+  }
+  #blockList=blockList[blockList$total_reads>0,c("blockID", "SimState", "MatBinoP", "total_reads",  "mat_reads")]
+  blockList=blockList[blockList$total_reads>0,c("blockID", "SimState", "MatBinoP","Rho", "total_reads",  "mat_reads")]
+  #b_tmp=tempfile(tmpdir ="/workdir/sc2457/HMM_simulation/toremove",fileext = ".txt")
+  b_tmp=tempfile(fileext = ".txt")
+  #b_tmp="sim_tmp.txt"
+  write.table(blockList, file = b_tmp, quote = F, sep = "\t", row.names = F)
+  #View(blockList)
+  
+  # naive model:treating SNPs independently.
+  blockList$AlleleDB_p_value <- 1
+  i=1
+  for (i in 1:dim(blockList)[1]){
+    a = binom.test(blockList$mat_reads[i], blockList$total_reads[i], 0.5)
+    blockList$AlleleDB_p_value[i] <- a$p.value    
+  }
+
+ blockList$AlleleDB_state <- "S"
+ blockList$AlleleDB_state[blockList$AlleleDB_p_value <0.05 & blockList$SimState=="M" & blockList$mat_reads/blockList$total_reads >= 0.5] <- "M"
+ blockList$AlleleDB_state[blockList$AlleleDB_p_value <0.05 & blockList$SimState=="M" & blockList$mat_reads/blockList$total_reads < 0.5] <- "P" 
+ 
+ 
+  ## HMM prediction
+  system(paste("python HMM_prediction.py",b_tmp), wait=TRUE)
+ ## HMM binomial test
+ 
+ # combine the reads in the same HMM blocks and perform bionomial test
+ hmm_result=read.table(paste(substr(b_tmp,1,nchar(b_tmp)-4),"_AlleleHMM.txt",sep = ""),header=T)
+ hmm_result$tag=0
+ hmm_result$accum_total_reads=0
+ hmm_result$accum_mat_reads=0
+ hmm_result$p_value = 1
+ i=1
+ accum_total_reads=hmm_result$total_reads[i]
+ accum_mat_reads=hmm_result$mat_reads[i]
+ hmm_result$tag[i]=1
+ for (i in 2:dim(hmm_result)[1]){
+   if (hmm_result$hmm_state[i] == hmm_result$hmm_state[i-1]){
+     hmm_result$tag[i]=1
+     accum_total_reads <- accum_total_reads + hmm_result$total_reads[i]
+     accum_mat_reads <- accum_mat_reads + hmm_result$mat_reads[i]
+   }
+   else{
+     hmm_result$accum_total_reads[hmm_result$tag==1] <- accum_total_reads
+     hmm_result$accum_mat_reads[hmm_result$tag==1] <- accum_mat_reads
+     a = binom.test(accum_mat_reads, accum_total_reads, 0.5)
+     hmm_result$p_value[hmm_result$tag==1] <- a$p.value
+     
+     hmm_result$tag=0
+     hmm_result$tag[i]=1
+     accum_total_reads <- hmm_result$total_reads[i]
+     accum_mat_reads   <- hmm_result$mat_reads[i]
+   }
+ }
+ hmm_result$accum_total_reads[hmm_result$tag==1] <- accum_total_reads
+ hmm_result$accum_mat_reads[hmm_result$tag==1] <- accum_mat_reads
+ a = binom.test(accum_mat_reads, accum_total_reads, 0.5)
+ hmm_result$p_value[hmm_result$tag==1] <- a$p.value
+ #print(dim(blockList)[1] == dim(hmm_result)[1])
+ 
+ blockList$HMM_p_value <- hmm_result$p_value
+ blockList$HMM_accum_total_reads <- hmm_result$accum_total_reads
+ blockList$HMM_accum_mat_reads<- hmm_result$accum_mat_reads
+ blockList$HMM_state<- hmm_result$hmm_state
+ ##test Sensitivity
+ if (sum(blockList$SimState!="S") !=0) {
+   SNP_Sensitivity = sum(blockList$AlleleDB_state=="M" & blockList$SimState=="M") /sum(blockList$SimState =="M") 
+   AlleleHMM_Sensitivity = sum(blockList$HMM_p_value <0.05 & blockList$HMM_state=="M" & blockList$SimState=="M") /sum(blockList$SimState=="M") 
+ }  else{
+    SNP_Sensitivity = sum(blockList$AlleleDB_state=="M" & blockList$SimState=="M") /(sum(blockList$SimState=="M")+1) 
+   AlleleHMM_Sensitivity = sum(blockList$HMM_p_value <0.05 & blockList$HMM_state=="M" & blockList$SimState=="M") /(sum(blockList$SimState=="M")+1) 
+ }
+ 
+ # specificity
+    SNP_Specificity = sum(blockList$AlleleDB_p_value >=0.05 & blockList$SimState=="S") /sum(blockList$SimState=="S") 
+   AlleleHMM_Specificity = sum(blockList$HMM_state=="S" & blockList$SimState=="S") /sum(blockList$SimState=="S") 
+ #print(AlleleHMM_Specificity)
+   
+  return (list(SNP_Sensitivity=SNP_Sensitivity, 
+               AlleleHMM_Sensitivity=AlleleHMM_Sensitivity,
+               SNP_Specificity = SNP_Specificity,
+               AlleleHMM_Specificity = AlleleHMM_Specificity
+               #, data=blockList 
+               ))
+}
+
+Sensitivity_betaBino_iter<- function(iteration,l, e, mat_p, od){
+  SNP_sen_list=c()
+  HMM_sen_list=c()
+  SNP_spec_list=c()
+  HMM_spec_list=c()
+  for (i in 1:iteration) {
+    #print (i)
+    s=Sensitivity_betaBino(l, e, mat_p, od)
+    SNP_sen_list=c(SNP_sen_list, s$SNP_Sensitivity)
+    HMM_sen_list=c(HMM_sen_list, s$AlleleHMM_Sensitivity)
+    SNP_spec_list=c(SNP_spec_list, s$SNP_Specificity)
+    HMM_spec_list=c(HMM_spec_list, s$AlleleHMM_Specificity)
+  }
+  return (c(mean(SNP_sen_list),mean(HMM_sen_list),
+            sd(SNP_sen_list)/sqrt(length(SNP_sen_list)),
+            sd(HMM_sen_list)/sqrt(length(HMM_sen_list)),
+            mean(SNP_spec_list),mean(HMM_spec_list),
+            sd(SNP_spec_list)/sqrt(length(SNP_spec_list)),
+            sd(HMM_spec_list)/sqrt(length(HMM_spec_list))))
+  #return (c(mean(SNP_sen_list), mean(HMM_sen_list)))
+}
+
+
+```
+
+test multi-threads with MatP in betaBinomial
+```{r}
+## test multi-threads with MatP
+
+numberOfBlock <- 3
+#legnth of each block
+l <- c(10,100,10)
+# expression level of each block
+e <- c(10,10,10)
+mat_p <- c(0.5,0.9,0.5)
+od <- c(0.25, 0.25, 0.25)
+
+library(parallel)
+m_test <- function(mat_p_2, iteration){
+  #mat_p_list = c(mat_p_list, mat_p_2) 
+  mat_p=c(0.5,mat_p_2,0.5)
+  #print(mat_p)
+  aveS = Sensitivity_betaBino_iter(iteration,l, e, mat_p, od)
+  return(c(mat_p_2,aveS))
+}
+
+test=mclapply(seq(0,1,0.05),FUN=function(idx){m_test(idx,iteration = 1000)}, mc.cores = 10)
+
+result=unlist(test)
+
+m1=data.frame(result[seq(1,length(result),9)],
+              result[seq(2,length(result),9)], 
+              result[seq(4,length(result),9)],
+              result[seq(6,length(result),9)],
+              result[seq(8,length(result),9)])
+names(m1)=c("matP","senMean", "senSE", "specMean", "specSE")
+m1$method="SNP independantly"
+#View(m)
+m2=data.frame(result[seq(1,length(result),9)],
+              result[seq(3,length(result),9)], 
+              result[seq(5,length(result),9)],
+              result[seq(7,length(result),9)],
+              result[seq(9,length(result),9)])
+names(m2)=c("matP","senMean", "senSE","specMean", "specSE")
+m2$method="Allele HMM"
+m=rbind.data.frame(m1,m2)
+write.table(m, file = "matP_SMS_OD0.25_sensitivity_and_specificity.txt", quote = F, sep = "\t",row.names = F)
+
+library(ggplot2)
+pdf("matP_and_sensitivity.pdf")
+ggplot(m, aes(x=matP, y=senMean, colour=method)) + 
+    geom_errorbar(aes(ymin=senMean-senSE, ymax=senMean+senSE), width=.01) +
+    geom_line() +
+    geom_point() #+ 
+    #theme_bw()
+dev.off()
+pdf("matP_and_specificity.pdf")
+ggplot(m, aes(x=matP, y=specMean, colour=method)) + 
+    geom_errorbar(aes(ymin=specMean-specSE, ymax=specMean+specSE), width=.01) +
+    geom_line() +
+    geom_point() #+ 
+    #theme_bw()
+dev.off()
+
+### length ####
+numberOfBlock <- 3
+#legnth of each block
+l <- c(10,100,10)
+# expression level of each block
+e <- c(10,10,10)
+mat_p <- c(0.5,0.9,0.5)
+od <- c(0.25, 0.25, 0.25)
+
+l_test <- function(l_2, iteration){
+  l=c(10, l_2, 10)
+  aveS = Sensitivity_betaBino_iter(iteration,l, e, mat_p, od)
+  return(c(l_2,aveS))
+}
+l_test_out=mclapply(seq(1,50,1),FUN=function(idx){l_test(idx,1000)}, mc.cores = 30)
+
+result=unlist(l_test_out)
+
+m1=data.frame(result[seq(1,length(result),9)],
+              result[seq(2,length(result),9)], 
+              result[seq(4,length(result),9)],
+              result[seq(6,length(result),9)],
+              result[seq(8,length(result),9)])
+names(m1)=c("length","senMean", "senSE", "specMean", "specSE")
+m1$method="SNP independantly"
+#View(m)
+m2=data.frame(result[seq(1,length(result),9)],
+              result[seq(3,length(result),9)], 
+              result[seq(5,length(result),9)],
+              result[seq(7,length(result),9)],
+              result[seq(9,length(result),9)])
+names(m2)=c("length","senMean", "senSE","specMean", "specSE")
+m2$method="Allele HMM"
+m=rbind.data.frame(m1,m2)
+write.table(m, file = "length_SMS_OD0.25_sensitivity_and_specificity.txt", quote = F, sep = "\t",row.names = F)
+
+library(ggplot2)
+pdf("length_SMS_OD0.25_sensitivity.pdf")
+ggplot(m, aes(x=length, y=senMean, colour=method)) + 
+    geom_errorbar(aes(ymin=senMean-senSE, ymax=senMean+senSE), width=.01) +
+    geom_line() +
+    geom_point() #+ 
+    #theme_bw()
+dev.off()
+pdf("length_SMS_OD0.25_specificity.pdf")
+ggplot(m, aes(x=length, y=specMean, colour=method)) + 
+    geom_errorbar(aes(ymin=specMean-specSE, ymax=specMean+specSE), width=.01) +
+    geom_line() +
+    geom_point() #+ 
+    #theme_bw()
+dev.off()
+
+
+### expression level###
+numberOfBlock <- 3
+#legnth of each block
+l <- c(10,100,10)
+# expression level of each block
+e <- c(10,10,10)
+mat_p <- c(0.5,0.9,0.5)
+od <- c(0.25, 0.25, 0.25)
+
+library(parallel)
+e_test <- function(e_2, iteration){
+  e=c(10, e_2, 10)
+  aveS = Sensitivity_betaBino_iter(iteration,l, e, mat_p, od) 
+  return(c(e_2,aveS))
+}
+e_test_out=mclapply(seq(1,50,1),FUN=function(idx){e_test(idx,1000)}, mc.cores = 20)
+e_test_out=mclapply(seq(1,500,10),FUN=function(idx){e_test(idx,10)}, mc.cores = 20)
+e_test_out=mclapply(seq(1,150,1),FUN=function(idx){e_test(idx,1000)}, mc.cores = 30)
+
+result=unlist(e_test_out)
+
+m1=data.frame(result[seq(1,length(result),9)],
+              result[seq(2,length(result),9)], 
+              result[seq(4,length(result),9)],
+              result[seq(6,length(result),9)],
+              result[seq(8,length(result),9)])
+names(m1)=c("exp","senMean", "senSE", "specMean", "specSE")
+m1$method="SNP independantly"
+#View(m)
+m2=data.frame(result[seq(1,length(result),9)],
+              result[seq(3,length(result),9)], 
+              result[seq(5,length(result),9)],
+              result[seq(7,length(result),9)],
+              result[seq(9,length(result),9)])
+names(m2)=c("exp","senMean", "senSE","specMean", "specSE")
+m2$method="Allele HMM"
+m=rbind.data.frame(m1,m2)
+write.table(m, file = "exp_SMS_OD0.25_sensitivity_and_specificity.txt", quote = F, sep = "\t",row.names = F)
+
+library(ggplot2)
+pdf("exp_SMS_OD0.25_sensitivity.pdf")
+ggplot(m, aes(x=exp, y=senMean, colour=method)) + 
+    geom_errorbar(aes(ymin=senMean-senSE, ymax=senMean+senSE), width=.01) +
+    geom_line() +
+    geom_point() #+ 
+    #theme_bw()
+dev.off()
+pdf("exp_SMS_OD0.25_specificity.pdf")
+ggplot(m, aes(x=exp, y=specMean, colour=method)) + 
+    geom_errorbar(aes(ymin=specMean-specSE, ymax=specMean+specSE), width=.01) +
+    geom_line() +
+    geom_point() #+ 
+    #theme_bw()
+dev.off()
+
+```
+
+test multi-threads with overdispersion in betaBinomial
+```{r}
+## test multi-threads with MatP
+
+numberOfBlock <- 3
+#legnth of each block
+l <- c(10,100,10)
+# expression level of each block
+e <- c(10,10,10)
+mat_p <- c(0.5,0.9,0.5)
+od <- c(0.1, 0.1, 0.1)
+
+library(parallel)
+od_test <- function(od_2, iteration){
+  od = c(0.1, od_2, 0.1)
+  aveS = Sensitivity_betaBino_iter(iteration,l, e, mat_p, od)
+  return(c(od_2,aveS))
+}
+
+test=mclapply(seq(0.01,0.5,0.01),FUN=function(idx){od_test(idx,iteration = 3)}, mc.cores = 1)
+#test=mclapply(seq(0,0.9,0.1),FUN=function(idx){od_test(idx,iteration = 1000)}, mc.cores = 50)
+
+result=unlist(test)
+
+m1=data.frame(result[seq(1,length(result),9)],
+              result[seq(2,length(result),9)], 
+              result[seq(4,length(result),9)],
+              result[seq(6,length(result),9)],
+              result[seq(8,length(result),9)])
+names(m1)=c("OD","senMean", "senSE", "specMean", "specSE")
+m1$method="SNP independantly"
+#View(m)
+m2=data.frame(result[seq(1,length(result),9)],
+              result[seq(3,length(result),9)], 
+              result[seq(5,length(result),9)],
+              result[seq(7,length(result),9)],
+              result[seq(9,length(result),9)])
+names(m2)=c("OD","senMean", "senSE","specMean", "specSE")
+m2$method="Allele HMM"
+m=rbind.data.frame(m1,m2)
+write.table(m, file = "OD_and_sensitivity_and_specificity.txt", quote = F, sep = "\t",row.names = F)
+
+library(ggplot2)
+pdf("OD_and_sensitivity.pdf")
+ggplot(m, aes(x=OD, y=senMean, colour=method)) + 
+    geom_errorbar(aes(ymin=senMean-senSE, ymax=senMean+senSE), width=.01) +
+    geom_line() +
+    geom_point() #+ 
+    #theme_bw()
+dev.off()
+pdf("OD_and_specificity.pdf")
+ggplot(m, aes(x=OD, y=specMean, colour=method)) + 
+    geom_errorbar(aes(ymin=specMean-specSE, ymax=specMean+specSE), width=.01) +
+    geom_line() +
+    geom_point() #+ 
+    #theme_bw()
+dev.off()
+
+# specificity of SSS block
+mat_p <- c(0.5,0.5,0.5)
+SSS_test=mclapply(seq(0.01,0.5,0.01),FUN=function(idx){od_test(idx,iteration = 3)}, mc.cores = 1)
+#SSS_test=mclapply(seq(0,0.9,0.1),FUN=function(idx){od_test(idx,iteration = 1000)}, mc.cores = 50)
+result=unlist(SSS_test)
+
+m1=data.frame(result[seq(1,length(result),9)],
+              result[seq(2,length(result),9)], 
+              result[seq(4,length(result),9)],
+              result[seq(6,length(result),9)],
+              result[seq(8,length(result),9)])
+names(m1)=c("OD","senMean", "senSE", "specMean", "specSE")
+m1$method="SNP independantly"
+#View(m)
+m2=data.frame(result[seq(1,length(result),9)],
+              result[seq(3,length(result),9)], 
+              result[seq(5,length(result),9)],
+              result[seq(7,length(result),9)],
+              result[seq(9,length(result),9)])
+names(m2)=c("OD","senMean", "senSE","specMean", "specSE")
+m2$method="Allele HMM"
+m=rbind.data.frame(m1,m2)
+write.table(m, file = "OD_SSS_sensitivity_and_specificity.txt", quote = F, sep = "\t",row.names = F)
+pdf("OD_SSS_specificity.pdf")
+ggplot(m, aes(x=OD, y=specMean, colour=method)) + 
+    geom_errorbar(aes(ymin=specMean-specSE, ymax=specMean+specSE), width=.01) +
+    geom_line() +
+    geom_point() #+ 
+    #theme_bw()
+dev.off()
+#hist(rbetabinom(100, 10, 0.9, 0.5))
+
+```
+
+
+Change sensitivity calculation from =!S to ==M
 
 
 
