@@ -235,7 +235,8 @@ mat_v  = np.loadtxt(f_v, dtype=int ,delimiter='\t', usecols=[5], skiprows=1)
 total_v = np.loadtxt(f_v, dtype=int ,delimiter='\t', usecols=[4], skiprows=1)
 t = 1e-05
 t_mm, t_ms, t_mp = 1-t, t/2, t/2
-t_sm, t_ss, t_sp =  1.84668156e-03, 9.96232518e-01, 1.92080089e-03
+#t_sm, t_ss, t_sp =  1.84668156e-03, 9.96232518e-01, 1.92080089e-03
+t_sm, t_ss, t_sp = t/2, 1-t, t/2
 t_pm, t_ps, t_pp = t/2, t/2, 1-t
 T = np.log(np.array( [[t_mm, t_ms, t_mp],[t_sm, t_ss, t_sp],[t_pm, t_ps, t_pp]]))
 
