@@ -317,8 +317,8 @@ def run_em_T_mp_fixed(t):
     make_em_plot(p_Y_f_list,"count_min=1 Tmx, Tpx fixed, t="+str(t)+", Tsx allow change for EM", f_int[0:-4]+"_em_p_Y_f_list_plot_count_min=1_Tmpfixed_t="+str(t)+".pdf")
     make_em_plot(p_Y_f_list, "count_min=1 Tmx, Tpx fixed, t="+str(t)+", Tsx allow change for EM", f_int[0:-4]+"_em_p_Y_f_list_plot_count_min=1_Tmpfixed_t="+str(t)+"_50.pdf" ,50)
     with open(f_int[0:-4]+"_t="+str(t)+'_parameters.txt', 'w') as out:
-        out.write("T="+new_T_list[-1]+"\n")
-        out.write("P="+new_P_list[-1]+"\n")
+        out.write("T="+str(new_T_list[-1])+"\n")
+        out.write("P="+str(new_P_list[-1])+"\n")
     return [t, new_T_list,new_P_list, p_Y_f_list]
 
 
@@ -326,26 +326,34 @@ def run():
     t_list=[]
     for i in range(1,10):
         t_list.append(10**(-i))
-    
-    pool = multiprocessing.Pool(processes=9)
-    pool_output = pool.map(run_em_T_mp_fixed, t_list )
-    # pool_output looks like [[t, new_T_list,new_P_list, p_Y_f_list],...]
-    pool.close() # no more tasks
-    pool.join()
-    
-    #for p in pool_output:
-    for i in range(1,10):
-        t, new_T_list,new_P_list, _ = pool_output[i-1]
-        new_T = new_T_list[-1]
-        new_P = new_P_list[-1]
-        #print t
-        #print np.exp(new_T)
-        #print new_P
-        if counts_minus_hmm == "-":
-            hmm_prediction(counts_plus_hmm, " ", '1e-0'+str(i),new_T, new_P)
-        else:
-            hmm_prediction(counts_plus_hmm, "+", '1e-0'+str(i),new_T, new_P)
-            hmm_prediction(counts_minus_hmm, "-",'1e-0'+str(i),new_T, new_P)
+    try:
+        pool = multiprocessing.Pool(processes=9)
+        pool_output = pool.map(run_em_T_mp_fixed, t_list )
+        # pool_output looks like [[t, new_T_list,new_P_list, p_Y_f_list],...]
+        pool.close() # no more tasks
+        pool.join()
+        
+        #for p in pool_output:
+        for i in range(1,10):
+            t, new_T_list,new_P_list, _ = pool_output[i-1]
+            new_T = new_T_list[-1]
+            new_P = new_P_list[-1]
+            #print t
+            #print np.exp(new_T)
+            #print new_P
+    except: # in case pool doesn't work
+        result=[]
+        for i in range(1,10):
+            result.append(run_em_T_mp_fixed(10**(-i)))
+        for i in range(1,10):
+            t, new_T_list,new_P_list, _ = result[i-1]
+            new_T = new_T_list[-1]
+            new_P = new_P_list[-1]
+    if counts_minus_hmm == "-":
+        hmm_prediction(counts_plus_hmm, " ", '1e-0'+str(i),new_T, new_P)
+    else:
+        hmm_prediction(counts_plus_hmm, "+", '1e-0'+str(i),new_T, new_P)
+        hmm_prediction(counts_minus_hmm, "-",'1e-0'+str(i),new_T, new_P)
 
 
 
