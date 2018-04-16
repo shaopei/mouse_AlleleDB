@@ -333,30 +333,51 @@ def run():
         pool.close() # no more tasks
         pool.join()
         
-        #for p in pool_output:
-        for i in range(1,10):
-            t, new_T_list,new_P_list, _ = pool_output[i-1]
-            new_T = new_T_list[-1]
-            new_P = new_P_list[-1]
-            #print t
-            #print np.exp(new_T)
-            #print new_P
+        ##for p in pool_output:
+        #for i in range(1,10):
+        #    t, new_T_list,new_P_list, _ = pool_output[i-1]
+        #    new_T = new_T_list[-1]
+        #    new_P = new_P_list[-1]
+        #    #print t
+        #    #print np.exp(new_T)
+        #    #print new_P
+        #    if counts_minus_hmm == "-":
+        #        hmm_prediction(counts_plus_hmm, " ", '1e-0'+str(i),new_T, new_P)
+        #    else:
+        #        hmm_prediction(counts_plus_hmm, "+", '1e-0'+str(i),new_T, new_P)
+        #        hmm_prediction(counts_minus_hmm, "-",'1e-0'+str(i),new_T, new_P)
     except: # in case pool doesn't work
         result=[]
         for i in range(1,10):
             result.append(run_em_T_mp_fixed(10**(-i)))
-        for i in range(1,10):
-            t, new_T_list,new_P_list, _ = result[i-1]
-            new_T = new_T_list[-1]
-            new_P = new_P_list[-1]
-    if counts_minus_hmm == "-":
-        hmm_prediction(counts_plus_hmm, " ", '1e-0'+str(i),new_T, new_P)
-    else:
-        hmm_prediction(counts_plus_hmm, "+", '1e-0'+str(i),new_T, new_P)
-        hmm_prediction(counts_minus_hmm, "-",'1e-0'+str(i),new_T, new_P)
+        #for i in range(1,10):
+        #    t, new_T_list,new_P_list, _ = result[i-1]
+        #    new_T = new_T_list[-1]
+        #    new_P = new_P_list[-1]
+        #    if counts_minus_hmm == "-":
+        #        hmm_prediction(counts_plus_hmm, " ", '1e-0'+str(i),new_T, new_P)
+        #    else:
+        #        hmm_prediction(counts_plus_hmm, "+", '1e-0'+str(i),new_T, new_P)
+        #        hmm_prediction(counts_minus_hmm, "-",'1e-0'+str(i),new_T, new_P)
 
 
 
+def prediction():
+    for i in range(1,10):
+        #print str(10**(-i))
+        with open(f_int[0:-4]+"_t="+str(10**(-i))+'_parameters.txt') as p_in:
+            l=p_in.readlines()
+        T=[]
+        for ll in l[0:3]:
+            for lll in ll.strip().strip('T=').strip('[').strip(']').split(" "):
+                T.append(float(lll))
+        new_T=np.array(T).reshape(3,3)
+        new_P=[float(ll) for ll in l[-1].strip().strip('P=').strip('[').strip(']').split(",")]
+        if counts_minus_hmm == "-":
+            hmm_prediction(counts_plus_hmm, " ", '1e-0'+str(i),new_T, new_P)
+        else:
+            hmm_prediction(counts_plus_hmm, "+", '1e-0'+str(i),new_T, new_P)
+            hmm_prediction(counts_minus_hmm, "-",'1e-0'+str(i),new_T, new_P)
 
 
 
@@ -463,5 +484,10 @@ def XXXX():
 
 
 if __name__ == '__main__':
-    run()
+    try:
+        if argv[5]=="predict":
+            prediction()
+    except:
+        run()
+        prediction()
     
