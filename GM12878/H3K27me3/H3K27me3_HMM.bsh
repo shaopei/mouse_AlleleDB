@@ -62,7 +62,7 @@ cat ${j}_counts_hmm.txt| awk '{OFS="\t"} NR>1 {print $1"_"$2, $0}'|LC_ALL=C sort
 cat ${j}_counts_hmm.txt| awk '{OFS="\t"} NR>1 {print $1"_"$2}' >> A_header.tmp
 done
 
-cat A_header.tmp | LC_ALL=C sort -k1,1 --parallel=30 > A_header_uniq.tmp
+cat A_header.tmp | LC_ALL=C sort -k1,1 --parallel=30 |uniq > A_header_uniq.tmp
 LC_ALL=C join -a1 -e0 -t $'\t' -j 1 -o 1.1,2.4,2.5,2.6 A_header_uniq.tmp A_ENCFF000ASV_counts_hmm.tmp > A_total_counts_hmm.tmp1
 LC_ALL=C join -a1 -e0 -t $'\t' -j 1 -o 1.1,1.2,1.3,1.4,2.4,2.5,2.6 A_total_counts_hmm.tmp1 A_ENCFF000ASW_counts_hmm.tmp > A_total_counts_hmm.tmp2
 LC_ALL=C join -a1 -e0 -t $'\t' -j 1 -o 1.1,1.2,1.3,1.4,1.5,1.6,1.7,2.4,2.5,2.6 A_total_counts_hmm.tmp2 A_ENCFF000ASZ_counts_hmm.tmp > A_total_counts_hmm.tmp3
@@ -70,8 +70,8 @@ LC_ALL=C join -a1 -e0 -t $'\t' -j 1 -o 1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,1.10,
 LC_ALL=C join -a1 -e0 -t $'\t' -j 1 -o 1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,1.10,1.11,1.12,1.13,2.4,2.5,2.6 A_total_counts_hmm.tmp4 A_ENCFF001EXO_counts_hmm.tmp > A_total_counts_hmm.tmp5
 cat A_total_counts_hmm.tmp5 |awk 'BEGIN {OFS="\t"} {print $1, $2+$5+$8+$11+$14, $3+$6+$9+$12+$15, $4+$7+$10+$13+$16}' \
  |awk 'BEGIN {FS="_"; OFS="\t"} {print $1, $2, "S"}' |LC_ALL=C sort -k2 --parallel=30 > H3K27me3_counts_hmm.txt
- rm A_*.tmp A_total_counts_hmm.tmp*
-python hmm_spc.py H3K27me3_counts_hmm.txt H3K27me3_counts_hmm.txt - 22
+ mv A_*.tmp A_total_counts_hmm.tmp* toremove/.
+python hmm_spc.py H3K27me3_counts_hmm.txt H3K27me3_counts_hmm.txt - 22 #predict
 
 
 #### get hmm regions end ####
@@ -203,18 +203,20 @@ for T in {1..9}
   do join -t $'\t' -j 1 -o 1.2,1.3,1.4,1.5,1.6,1.7,2.8 ${j}_counts_hmm_regions_t1e-0${T}.temp_cov.bed ${j}_counts_hmm_regions_t1e-0${T}.iden_cov.bed | LC_ALL=C sort -k1,1n -k2,2n --parallel=30 > ${j}_counts_hmm_regions_t1e-0${T}.merged_cov.bed &
   done
 done
+
 wait
 for f in *.cnt.gz
 do j=${f:0:11} ; PATBOWTIE=${j}.pat.bowtie ; MATBOWTIE=${j}.mat.bowtie
-  for T in {1..9}
-  do
-  rm ${j}_counts_hmm_regions_t1e-0${T}.temp_cov.bed ${j}_counts_hmm_regions_t1e-0${T}.mat_cov.bed ${j}_counts_hmm_regions_t1e-0${T}.pat_cov.bed ${j}_counts_hmm_regions_t1e-0${T}.iden_cov.bed
+  T=1
+  #for T in {1..9}
+  #do
+  mv ${j}_counts_hmm_regions_t1e-0${T}.temp_cov.bed ${j}_counts_hmm_regions_t1e-0${T}.mat_cov.bed ${j}_counts_hmm_regions_t1e-0${T}.pat_cov.bed ${j}_counts_hmm_regions_t1e-0${T}.iden_cov.bed toremove/.
   python ${PL}/BinomialTestFor_merged_cov.bed.py ${j}_counts_hmm_regions_t1e-0${T}.merged_cov.bed ${j}_counts_hmm_regions_t1e-0${T}.merged_cov_binomtest.bed
-  rm ${j}_counts_hmm_regions_t1e-0${T}.merged_cov.bed
+  #mv ${j}_counts_hmm_regions_t1e-0${T}.merged_cov.bed toremove/.
 # output of BinomialTestFor_merged_cov.bed.py:(hmm+BinomialTest) if p-value <= 0.05, remain what it got from hmm (can ne M,P, or S), otherwise S.
   python ${PL}/FalsePosFor_merged_cov.bed.py ${j}_counts_hmm_regions_t1e-0${T}.merged_cov_binomtest.bed ${FDR_SIMS} ${FDR_CUTOFF} > ${j}_counts_hmm_regions_t1e-0${T}.merged_cov_binomtest_FDR.txt
   awk 'NR==1 { print $0 } NR>1 && $9 <= thresh { print $0 }'  thresh=$(awk 'END {print $6}' ${j}_counts_hmm_regions_t1e-0${T}.merged_cov_binomtest_FDR.txt) < ${j}_counts_hmm_regions_t1e-0${T}.merged_cov_binomtest.bed > ${j}_counts_hmm_regions_t1e-0${T}_interestingHets.bed &
-  done
+  #done
 done
 
 ### Combined reads
