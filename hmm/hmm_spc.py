@@ -367,10 +367,13 @@ def prediction():
         #print str(10**(-i))
         with open(f_int[0:-4]+"_t="+str(10**(-i))+'_parameters.txt') as p_in:
             l=p_in.readlines()
+        print i
         T=[]
         for ll in l[0:3]:
             for lll in ll.strip().strip('T=').strip('[').strip(']').split(" "):
+                print lll
                 T.append(float(lll))
+            print T
         new_T=np.array(T).reshape(3,3)
         new_P=[float(ll) for ll in l[-1].strip().strip('P=').strip('[').strip(']').split(",")]
         if counts_minus_hmm == "-":
