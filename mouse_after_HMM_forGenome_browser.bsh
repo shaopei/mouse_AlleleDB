@@ -47,6 +47,13 @@ python ${PL}/FalsePosFor_merged_cov.bed.py ${j}.merged_cov_binomtest.bed ${FDR_S
 awk 'NR==1 { print $0 } NR>1 && $9 <= thresh { print $0 }'  thresh=$(awk 'END {print $6}' ${j}.merged_cov_binomtest_FDR.txt) < ${j}.merged_cov_binomtest.bed > ${j}_interestingHets.bed
 done
 
+# examine how many hmm_state M or P becaome S after binomial test
+for f in counts_*_hmm_regions_t*.merged_cov_binomtest.bed;
+  do echo $f
+  cat ${f} | awk ' $4 != "S" {print $0}' |wc -l
+  cat ${f} | awk ' $4 != "S" && $4==$5 {print $0}' |wc -l
+  cat ${f} | awk ' $4 != "S" && $4!=$5 {print $0}' |wc -l
+done
 
 ### make bed with only the 5prime head reads
 for f in counts_*_hmm_regions_t*_interestingHets.bed;
