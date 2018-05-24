@@ -202,7 +202,6 @@ for name in `ls $FQ_INPUT | awk -F"/" '{print $NF}' | rev | cut -d \. -f 3-| cut
   done
 
 wait
-#gzip -d ${TMPDIR}/noadapt/*.fastq.gz
 
 for name in `ls $FQ_INPUT | awk -F"/" '{print $NF}' | rev | cut -d \. -f 3-| cut -d _ -f 2- |rev | sort | uniq`
  do
@@ -222,13 +221,13 @@ for name in `ls $FQ_INPUT | awk -F"/" '{print $NF}' | rev | cut -d \. -f 3-| cut
   done
 
 
-for name in `ls $FQ_INPUT | awk -F"/" '{print $NF}' | rev | cut -d \. -f 3-| cut -d _ -f 2- |rev | sort | uniq`
- do
+#for name in `ls $FQ_INPUT | awk -F"/" '{print $NF}' | rev | cut -d \. -f 3-| cut -d _ -f 2- |rev | sort | uniq`
+# do
   ### for the reads that are Merged 
   # Remove PCR duplciates. Keep read length >=20
   # No UMI barcode, sckip this step
   # prinseq-lite.pl -fastq ${TMPDIR}/noadapt/${name}_SeqPrepMerged.fastq -derep 1 -out_format 3 -out_bad null -out_good ${TMPDIR}/nodups/${name}_SeqPrepMerged_dedup -min_len 20 2> ${OUTPUT}/${name}_SeqPrepMerged.prinseq-pcrDups.gd &
- done
+# done
 
 wait
 
