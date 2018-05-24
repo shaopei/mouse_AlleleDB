@@ -202,15 +202,15 @@ for name in `ls $FQ_INPUT | awk -F"/" '{print $NF}' | rev | cut -d \. -f 3-| cut
   done
 
 wait
-gzip -d ${TMPDIR}/noadapt/*.fastq.gz
+#gzip -d ${TMPDIR}/noadapt/*.fastq.gz
 
 for name in `ls $FQ_INPUT | awk -F"/" '{print $NF}' | rev | cut -d \. -f 3-| cut -d _ -f 2- |rev | sort | uniq`
  do
 
   ### for the reads that are not merged
   ## Remove adapter
-  cutadapt -a AGATCGGAAGAGCACACGTCTGAACTC -e 0.10 --overlap 2 --minimum-length=10 --output=${TMPDIR}/noadapt/${name}_noadapt_R1.fastq ${TMPDIR}/${name}_SeqPrep_R1.fastq &
-  cutadapt -a GATCGTCGGACTGTAGAACTCTGAACG -e 0.10 --overlap 2 --minimum-length=10 --output=${TMPDIR}/noadapt/${name}_noadapt_R2.fastq ${TMPDIR}/${name}_SeqPrep_R2.fastq &
+  cutadapt -a AGATCGGAAGAGCACACGTCTGAACTC -e 0.10 --overlap 2 --minimum-length=10 --output=${TMPDIR}/noadapt/${name}_noadapt_R1.fastq ${TMPDIR}/${name}_SeqPrep_R1.fastq.gz &
+  cutadapt -a GATCGTCGGACTGTAGAACTCTGAACG -e 0.10 --overlap 2 --minimum-length=10 --output=${TMPDIR}/noadapt/${name}_noadapt_R2.fastq ${TMPDIR}/${name}_SeqPrep_R2.fastq.gz &
   wait
 
 
