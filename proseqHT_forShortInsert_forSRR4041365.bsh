@@ -159,8 +159,8 @@ else
 fi
 
 # bash generate random 32 character alphanumeric string (upper and lowercase).
-#TMPDIR=$TMPDIR/$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-TMPDIR=/workdir/sc2457/mouse_AlleleSpecific/SRR/split-files/useSeqPrep/My_proseqHT_forShortInsert_output_dir_NoIncorrectDeduplicate/0AVxkmS4sKeZBGNG3l7e3IUIjAxC9NBU
+TMPDIR=$TMPDIR/$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+
 ## Print out
 echo " " 
 echo "Processing PRO-seq data ..." 
@@ -186,21 +186,22 @@ mkdir ${TMPDIR}
 ## Preprocess data.  Remove adapters.  Trim.
 echo " "
 echo "Preprocessing fastq files:"
-#mkdir ${TMPDIR}/noadapt
+mkdir ${TMPDIR}/noadapt
+#mkdir ${TMPDIR}/nodups
 
-#for name in `ls $FQ_INPUT | awk -F"/" '{print $NF}' | rev | cut -d \. -f 3-| cut -d _ -f 2- |rev | sort | uniq`
-# do
+for name in `ls $FQ_INPUT | awk -F"/" '{print $NF}' | rev | cut -d \. -f 3-| cut -d _ -f 2- |rev | sort | uniq`
+ do
 
   ## SeqPrep will Remove adapter and merge the R1 and R2 reads if there is enough overlap
-#  SeqPrep -L 20 -A AGATCGGAAGAGCACACGTCTGAACTC -B GATCGTCGGACTGTAGAACTCTGAACG \
-#  -f ${name}_R1.fastq.gz -r ${name}_R2.fastq.gz \
-#  -s ${TMPDIR}/noadapt/${name}_SeqPrepMerged.fastq.gz \
-#  -1 ${TMPDIR}/${name}_SeqPrep_R1.fastq.gz -2 ${TMPDIR}/${name}_SeqPrep_R2.fastq.gz & #\
+  SeqPrep -L 20 -A AGATCGGAAGAGCACACGTCTGAACTC -B GATCGTCGGACTGTAGAACTCTGAACG \
+  -f ${name}_R1.fastq.gz -r ${name}_R2.fastq.gz \
+  -s ${TMPDIR}/noadapt/${name}_SeqPrepMerged.fastq.gz \
+  -1 ${TMPDIR}/${name}_SeqPrep_R1.fastq.gz -2 ${TMPDIR}/${name}_SeqPrep_R2.fastq.gz & #\
   #-3 ${TMPDIR}/noadapt/${name}_discarded_R1.fastq.gz -4 ${TMPDIR}/noadapt/${name}_discarded_R2.fastq.gz -E ${TMPDIR}/noadapt/${name}_alignment.txt.gz
   
-#  done
+  done
 
-#wait
+wait
 
 for name in `ls $FQ_INPUT | awk -F"/" '{print $NF}' | rev | cut -d \. -f 3-| cut -d _ -f 2- |rev | sort | uniq`
  do

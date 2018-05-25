@@ -187,7 +187,7 @@ mkdir ${TMPDIR}
 echo " "
 echo "Preprocessing fastq files:"
 mkdir ${TMPDIR}/noadapt
-mkdir ${TMPDIR}/nodups
+#mkdir ${TMPDIR}/nodups
 
 for name in `ls $FQ_INPUT | awk -F"/" '{print $NF}' | rev | cut -d \. -f 3-| cut -d _ -f 2- |rev | sort | uniq`
  do
@@ -198,14 +198,14 @@ for name in `ls $FQ_INPUT | awk -F"/" '{print $NF}' | rev | cut -d \. -f 3-| cut
 
   ## Collapse reads using prinseq-lite.pl.
   ## Remove PCR duplciates.
-  prinseq-lite.pl -fastq ${TMPDIR}/noadapt/${name}_noadapt_R1.fastq -fastq2 ${TMPDIR}/noadapt/${name}_noadapt_R2.fastq -derep 1 -out_format 3 -out_bad null -out_good ${TMPDIR}/nodups/${name}_dedup 2> ${OUTPUT}/${name}.prinseq-pcrDups.gd &
+  #prinseq-lite.pl -fastq ${TMPDIR}/noadapt/${name}_noadapt_R1.fastq -fastq2 ${TMPDIR}/noadapt/${name}_noadapt_R2.fastq -derep 1 -out_format 3 -out_bad null -out_good ${TMPDIR}/nodups/${name}_dedup 2> ${OUTPUT}/${name}.prinseq-pcrDups.gd &
 
   done
 wait
 
 ## Cleanup.
 #rm ${TMPDIR}/noadapt/*.fastq
-gzip ${TMPDIR}/nodups/*.fastq
+#gzip ${TMPDIR}/nodups/*.fastq
 
 
 #############################################
@@ -216,8 +216,10 @@ for name in `ls ${TMPDIR}/nodups/*.fastq.gz  | awk -F"/" '{print $NF}' |grep -v 
  do
   ## Align using BWA.
   # aligh pair end reads using bwa mem
-  bwa mem -k 19 -t 32 ${BWAIDX} ${TMPDIR}/nodups/${name}_dedup_1.fastq.gz ${TMPDIR}/nodups/${name}_dedup_2.fastq.gz | \
-  samtools view -bf 0x2 -q 10 - | samtools sort -n -@ 32 - > ${TMPDIR}/${name}.sort.bam & 
+  bwa mem -k 19 -t 32 ${BWAIDX} ${TMPDIR}/noadapt/${name}_noadapt_R1.fastq.gz ${TMPDIR}/noadapt/${name}_noadapt_R2.fastq.gz | \
+  samtools view -bf 0x2 -q 10 - | samtools sort -n -@ 32 - > ${TMPDIR}/${name}.sort.bam &
+  #0x2  the read is mapped in a proper pair
+
  done
 wait
 
