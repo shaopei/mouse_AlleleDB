@@ -237,11 +237,11 @@ for f in ${TMPDIR}/*.sort.bam
    j=`echo $f | awk -F"/" '{print $NF}' | rev | cut -d \. -f 3- |rev `
    echo ${j} > ${OUTPUT}/${j}.align.log
 
-   ## Report the 5' end of the RNA is on the 5' end of R2 read, but opposite strand
-   if [ "${MAP5}" == "TRUE" ] ; then 
-      bedtools bamtobed -bedpe -mate1 -i $f 2> ${TMPDIR}/${j}.kill.warnings | awk 'BEGIN{OFS="\t"} ($9 == "+") {print $1,$2,$2+1,$7,$8,$9}; ($9 == "-") {print $1,$3-1,$3,$7,$8,$9}'|gzip > ${TMPDIR}/${j}.bed.gz      
-   else  ## report the 3-prime end of the RNA, is the 5' end of R1 read, but opposite strand
-      bedtools bamtobed -bedpe -mate1 -i $f 2> ${TMPDIR}/${j}.kill.warnings | awk 'BEGIN{OFS="\t"} ($9 == "+") {print $1,$6,$6+1,$7,$8,$9}; ($9 == "-") {print $1,$5-1,$5,$7,$8,$9}' |gzip  > ${TMPDIR}/${j}.bed.gz
+   ## Report the 5' end of the RNA is on the 5' end of R2 read, but opposite strand (??)
+   if [ "${MAP5}" == "TRUE" ] ; then #report the 5 prime end of RNA, in Engreitz data is 5 prime end of R2, same strand
+      bedtools bamtobed -bedpe -mate1 -i $f 2> ${TMPDIR}/${j}.kill.warnings | awk 'BEGIN{OFS="\t"} ($10 == "+") {print $1,$5,$5+1,$7,$8,$10}; ($10 == "-") {print $1,$6-1,$6,$7,$8,$10}'|gzip > ${TMPDIR}/${j}.bed.gz      
+   else  ## report the 3-prime end of the RNA, in Engreitz data is the 5' end of R1 read, but opposite strand
+      bedtools bamtobed -bedpe -mate1 -i $f 2> ${TMPDIR}/${j}.kill.warnings | awk 'BEGIN{OFS="\t"} ($9 == "+") {print $1,$2,$2+1,$7,$8,$10}; ($9 == "-") {print $1,$3-1,$3,$7,$8,$10}' |gzip  > ${TMPDIR}/${j}.bed.gz
    fi
 
    echo 'Number of mappable reads:' >> ${OUTPUT}/${j}.align.log
