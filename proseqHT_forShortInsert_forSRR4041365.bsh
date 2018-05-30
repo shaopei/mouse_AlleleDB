@@ -226,7 +226,8 @@ for name in `ls $FQ_INPUT | awk -F"/" '{print $NF}' | rev | cut -d \. -f 3-| cut
   ### for the reads that are Merged 
   # Remove PCR duplciates. Keep read length >=20
   # this dataset has no UMI barcode, so only use prinseq-lite.pl to temove reads that are not paired
-  prinseq-lite.pl -fastq ${TMPDIR}/noadapt/${name}_SeqPrepMerged.fastq -derep 1 -out_format 3 -out_bad null -out_good ${TMPDIR}/nodups/${name}_SeqPrepMerged_dedup -min_len 20 2> ${OUTPUT}/${name}_SeqPrepMerged.prinseq-pcrDups.gd &
+  gzip -d ${TMPDIR}/noadapt/${name}_SeqPrepMerged.fastq.gz 
+  prinseq-lite.pl -fastq ${TMPDIR}/noadapt/${name}_SeqPrepMerged.fastq -out_format 3 -out_bad null -out_good ${TMPDIR}/nodups/${name}_SeqPrepMerged_dedup -min_len 20 2> ${OUTPUT}/${name}_SeqPrepMerged.prinseq-pcrDups.gd &
 done
 
 wait
