@@ -17,6 +17,29 @@ R --vanilla --slave --args $(pwd) counts_minus_noX.txt ${Min_count} ${Max_Pvalus
 Input_counts_plus=counts_plus_noX_MinCount${Min_count}_MaxPvalue${Max_Pvalus}.txt
 Input_counts_minus=counts_minus_noX_MinCount${Min_count}_MaxPvalue${Max_Pvalus}.txt
 
+####
+# add CNV from both CAST and 129S1
+cnv_1=/workdir/sc2457/mouse_AlleleSpecific/mouse_genome.sanger.ac.uk/working/PersonalGenome_P.CAST_M.129S1_indelsNsnps_CAST.subsample.bam/P.CAST_M.129S1_indelsNsnps_CAST.subsample.bam.alleleSeqInput.cnv
+cnv_2=/workdir/sc2457/mouse_AlleleSpecific/mouse_genome.sanger.ac.uk/working/PersonalGenome_P.CAST_M.129S1_indelsNsnps_129S1.subsample.bam/P.CAST_M.129S1_indelsNsnps_129S1.subsample.bam.alleleSeqInput.cnv
+cat ${cnv_1}| grep -v X | awk 'BEGIN{OFS="\t"; t="_"} {print $1t$2,$0}'| LC_ALL=C  sort -k1  --parallel=30 > cnv_1
+cat ${cnv_2}| grep -v X | awk 'BEGIN{OFS="\t"; t="_"} {print $1t$2,$0}'| LC_ALL=C  sort -k1  --parallel=30  > cnv_2
+LC_ALL=C join -t $'\t' -j 1 -o 1.1,1.2,1.3,1.4,2.4 cnv_1 cnv_2 > cnv_both
+
+
+cat ${Input_counts_plus}| awk 'BEGIN{OFS="\t"; t="_"} (NR >1){print $1t$2,$0}'| LC_ALL=C  sort -k1  --parallel=30 > temp_plus
+head -n 1 ${Input_counts_plus} | awk 'BEGIN{OFS="\t"} {print $0, "cnv1", "cnv2"}' > ${Input_counts_plus}_cnv
+LC_ALL=C join -t $'\t' -j 1 -o 1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,1.10,1.11,1.12,1.13,1.14,1.15,1.16,1.17,1.18,1.19,1.20,1.21,1.22,2.4,2.5 temp_plus cnv_both |LC_ALL=C  sort -k1,1n -k2,2n  --parallel=30>>${Input_counts_plus}_cnv
+
+cat ${Input_counts_minus}| awk 'BEGIN{OFS="\t"; t="_"} (NR >1){print $1t$2,$0}'| LC_ALL=C  sort -k1  --parallel=30 > temp_minus
+head -n 1 ${Input_counts_minus} | awk 'BEGIN{OFS="\t"} {print $0, "cnv1", "cnv2"}' > ${Input_counts_minus}_cnv
+LC_ALL=C join -t $'\t' -j 1 -o 1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,1.10,1.11,1.12,1.13,1.14,1.15,1.16,1.17,1.18,1.19,1.20,1.21,1.22,2.4,2.5 temp_plus cnv_both |LC_ALL=C  sort -k1,1n -k2,2n  --parallel=30>>${Input_counts_minus}_cnv
+
+rm cnv_1 cnv_2 temp_plus temp_minus
+mv ${Input_counts_plus}_cnv ${Input_counts_plus}
+mv ${Input_counts_minus}_cnv ${Input_counts_minus}
+
+####
+
 # $18 0.5 <= CNV <= 1.5
 # use for hmm training
 head ${Input_counts_plus} -n 1 |awk 'BEGIN{OFS="\t"} {print $1,$2,$19, $20, $21, "state"}' > counts_hmm.txt 
