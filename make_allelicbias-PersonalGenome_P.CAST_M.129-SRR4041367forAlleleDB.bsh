@@ -1,57 +1,63 @@
 #######################################################################
-### quality trim raw reads and make XXX_NotMerged.sort.bam using  proseqHT_forShortInsert_forSRR4041365.bsh
-# run proseqHT_forShortInsert_forSRR4041365.bsh on fastq.gz files from fastq-dump --split-files -O path/to/output SRR#######
+### quality trim raw reads using  proseqHT_forSRR4041365.bsh
+# run proseqHT_forSRR4041365.bsh on fastq.gz files from fastq-dump --split-files -O path/to/output SRR#######
+# SRR4041365-SRR4041367 do NOT use UNI barcode, so do NOT do deduplication, 
+# but still use prinseq-lite.pl to temove reads that are not paired
 
-#cd /workdir/sc2457/mouse_AlleleSpecific/SRR/split-files/useSeqPrep
-#export mouse_genome=/local/storage/data/short_read_index/mm10/bwa.rRNA-0.7.8-r455/mm10.rRNA.fa.gz
-#export mouse_chinfo=/local/storage/data/mm10/mm10.chromInfo
+cd /workdir/sc2457/mouse_AlleleSpecific/SRR/split-files
+export mouse_genome=/local/storage/data/short_read_index/mm10/bwa.rRNA-0.7.8-r455/mm10.rRNA.fa.gz
+export mouse_chinfo=/local/storage/data/mm10/mm10.chromInfo
 
-#mkdir My_proseqHT_forShortInsert_output_dir
-#bash proseqHT_forShortInsert_forSRR4041365.bsh -I \*.fastq.gz -i $mouse_genome -c $mouse_chinfo -T ./My_proseqHT_forShortInsert_output_dir/ -O ./My_proseqHT_forShortInsert_output_dir/
+mkdir My_proseqHT_output_dir_NoIncorrectDeduplicate
+# default is map on the 5 prime of nascent RNA
+bash proseqHT_forSRR4041365.bsh -I SRR4041367_R\*.fastq.gz -i $mouse_genome -c $mouse_chinfo -T ./My_proseqHT_output_dir_NoIncorrectDeduplicate/ -O ./My_proseqHT_output_dir_NoIncorrectDeduplicate/
 
-#######################################################################
-### make combined file for alleleDB 
-cd /workdir/sc2457/mouse_AlleleSpecific/SRR/split-files/useSeqPrep/My_proseqHT_forShortInsert_output_dir/cvKE67j6zCWpH8m9NjE5Xo2aw9ExnYah/nodups
 
-## use all SeqPrepMerged reads and R1 reads, fastx_reverse_complement them and gzip
-zcat  SRR4041367_SeqPrepMerged_dedup.fastq.gz SRR4041367_dedup_1.fastq.gz | fastx_reverse_complement -Q33 |gzip > ../SRR4041367_forAlleleDB.fastq.gz
-
-## select R2 reads and fastx_reverse_complement
-# only keep R2 at paired end bam file SRR4041367_NotMerged.sort.bam
-# only keep R2 that is NOT overlapped with R1 at all, then convert to reverse_complement fastq.gz
-cd ..
-samtools view -f 0x2 SRR4041367_NotMerged.sort.bam | awk 'BEGIN{OFS="\t"} {print $1,$10,$11,$4,$3,$6,$7,$8,$9,length($10)}' |paste - - | \
-awk 'BEGIN{OFS="\t"} ($14-$18 >= $10) {print "@"$11"_2\n"$12"\n+"$11"_2\n"$13}; ($18-$14 >= $20) {print "@"$11"_2\n"$12"\n+"$11"_2\n"$13}' |gzip >> SRR4041367_forAlleleDB.fastq.gz
-
-#######################################################################
-## run AlleleDB
-
+########################################
+## run AlleleDB with nodups/R2 reads (no reverse compelement,no deduplicate, just remove adapter) 
 cd /workdir/sc2457/mouse_AlleleSpecific
-ln -s /workdir/sc2457/mouse_AlleleSpecific/SRR/split-files/useSeqPrep/My_proseqHT_forShortInsert_output_dir/cvKE67j6zCWpH8m9NjE5Xo2aw9ExnYah/SRR4041367_forAlleleDB.fastq.gz .
-
+ln -s /workdir/sc2457/mouse_AlleleSpecific/SRR/split-files/My_proseqHT_output_dir_NoIncorrectDeduplicate/6pDWqsFx17vimZIG838vNXXJ5tuCUJaJ/nodups/SRR4041367_dedup_2.fastq.gz .
 
 bash alleledb_strandSpecific_9_specifyFASTQ_mouse_SingleEndBowtie.sh \
-SRR4041367_forAlleleDB \
+SRR4041367_dedup_2 \
 PersonalGenome_P.CAST_M.129S1 \
 /workdir/sc2457/mouse_AlleleSpecific/mouse_genome.sanger.ac.uk/REL-1505-SNPs_Indels/PersonalGenome_P.CAST_M.129S1_indelsNsnps_CAST.subsample.bam \
 /workdir/sc2457/mouse_AlleleSpecific/mouse_genome.sanger.ac.uk/REL-1505-SNPs_Indels/PersonalGenome_P.CAST_M.129S1_indelsNsnps_CAST.subsample.bam/P.CAST_M.129S1_indelsNsnps_CAST.subsample.bam.alleleDBInput.snp.bed \
 /workdir/sc2457/mouse_AlleleSpecific \
-SRR4041367_forAlleleDB \
+SRR4041367_dedup_2 \
 /workdir/sc2457/alleleDB/alleledb_pipeline_mouse \
 /workdir/sc2457/mouse_AlleleSpecific/PIPELINE_StrandSpecific_P.CAST_M.129S1.mk \
 0.1 \
 ase \
-0 > allelicbias-PersonalGenome_P.CAST_M.129S1-SRR4041367_forAlleleDB.log 2>&1
+0 > allelicbias-PersonalGenome_P.CAST_M.129S1-SRR4041367_dedup_2.log 2>&1
 
 
-NAME          =SRR4041367_forAlleleDB
-PGENOME       =PersonalGenome_P.CAST_M.129S1
-PGENOME_PATH  =/workdir/sc2457/mouse_AlleleSpecific/mouse_genome.sanger.ac.uk/REL-1505-SNPs_Indels/PersonalGenome_P.CAST_M.129S1_indelsNsnps_CAST.subsample.bam
-SNPCALLS_PATH =/workdir/sc2457/mouse_AlleleSpecific/mouse_genome.sanger.ac.uk/REL-1505-SNPs_Indels/PersonalGenome_P.CAST_M.129S1_indelsNsnps_CAST.subsample.bam/P.CAST_M.129S1_indelsNsnps_CAST.subsample.bam.alleleDBInput.snp.bed
-FASTQ_PATH    =/workdir/sc2457/mouse_AlleleSpecific
-BASENAME/FASTQ=SRR4041367_forAlleleDB
-PIPELINE/PL   =/workdir/sc2457/alleleDB/alleledb_pipeline_mouse
-PIPELINE_FNAME=/workdir/sc2457/mouse_AlleleSpecific/PIPELINE_StrandSpecific_P.CAST_M.129S1.mk
-FDR_THRESHOLD =0.1
-ASB/ASE       =ase
-FLAG          =0
+# (NEED to DO) need to check the CNV from PersonalGenome_P.CAST_M.129S1_indelsNsnps_129S1.subsample.bam
+
+
+
+
+##
+## run AlleleDB with nodups/R2 reads (no reverse compelement, just remove adapter) AND fastx_reverse_complement_R1
+cd /workdir/sc2457/mouse_AlleleSpecific/SRR/split-files/My_proseqHT_output_dir_NoIncorrectDeduplicate/6pDWqsFx17vimZIG838vNXXJ5tuCUJaJ/nodups
+cp SRR4041367_dedup_2.fastq.gz ../SRR4041367_dedup_2_and_RC1.fastq.gz
+zcat SRR4041367_dedup_1.fastq.gz | fastx_reverse_complement -Q33 |gzip > ../SRR4041367_dedup_2_and_RC1.fastq.gz
+
+cd /workdir/sc2457/mouse_AlleleSpecific
+ln -s /workdir/sc2457/mouse_AlleleSpecific/SRR/split-files/My_proseqHT_output_dir_NoIncorrectDeduplicate/6pDWqsFx17vimZIG838vNXXJ5tuCUJaJ/SRR4041367_dedup_2_and_RC1.fastq.gz .
+
+bash alleledb_strandSpecific_9_specifyFASTQ_mouse_SingleEndBowtie.sh \
+SRR4041367_dedup_2_and_RC1 \
+PersonalGenome_P.CAST_M.129S1 \
+/workdir/sc2457/mouse_AlleleSpecific/mouse_genome.sanger.ac.uk/REL-1505-SNPs_Indels/PersonalGenome_P.CAST_M.129S1_indelsNsnps_CAST.subsample.bam \
+/workdir/sc2457/mouse_AlleleSpecific/mouse_genome.sanger.ac.uk/REL-1505-SNPs_Indels/PersonalGenome_P.CAST_M.129S1_indelsNsnps_CAST.subsample.bam/P.CAST_M.129S1_indelsNsnps_CAST.subsample.bam.alleleDBInput.snp.bed \
+/workdir/sc2457/mouse_AlleleSpecific \
+SRR4041367_dedup_2_and_RC1 \
+/workdir/sc2457/alleleDB/alleledb_pipeline_mouse \
+/workdir/sc2457/mouse_AlleleSpecific/PIPELINE_StrandSpecific_P.CAST_M.129S1.mk \
+0.1 \
+ase \
+0 > allelicbias-PersonalGenome_P.CAST_M.129S1-SRR4041367_dedup_2_and_RC1.log 2>&1
+
+
+
