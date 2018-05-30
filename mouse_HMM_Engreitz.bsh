@@ -40,29 +40,31 @@ mv ${Input_counts_minus}_cnv ${Input_counts_minus}
 
 ####
 
-# $18 0.5 <= CNV <= 1.5
+# $22, $23 0.5 <= CNV <= 1.5
 # use for hmm training
+p_value=0.05
+awk -v var="$variable"
+
 head ${Input_counts_plus} -n 1 |awk 'BEGIN{OFS="\t"} {print $1,$2,$19, $20, $21, "state"}' > counts_hmm.txt 
 cat ${Input_counts_plus} | \
-awk 'BEGIN{OFS="\t"} ($18 <1.5 && $18 >0.5) {print $1,$2,$19, $20, $21,$14,$15,$16}' |\
-awk 'BEGIN{OFS="\t"} ($8 <0.038) {print $1,$2,$3, $4, $5, $6}; ($8 >=0.038){print $1,$2,$3, $4, $5, "S"}' >> counts_hmm.txt 
-
+awk 'BEGIN{OFS="\t"} ($22 <1.5 && $22 >0.5 && $23 <1.5 && $23 >0.5) {print $1,$2,$19, $20, $21,$14,$15,$16}' |\
+awk -v p=$p_value 'BEGIN{OFS="\t"} ($8 <p) {print $1,$2,$3, $4, $5, $6}; ($8 >=p){print $1,$2,$3, $4, $5, "S"}' >> counts_hmm.txt 
 cat ${Input_counts_minus} |\
-awk 'BEGIN{OFS="\t"} ($18 <1.5 && $18 >0.5) {print $1,$2,$19, $20, $21,$14,$15,$16}' |\
-awk 'BEGIN{OFS="\t"} ($8 <0.038) {print $1,$2,$3, $4, $5, $6}; ($8 >=0.038){print $1,$2,$3, $4, $5, "S"}' >> counts_hmm.txt 
+awk 'BEGIN{OFS="\t"} ($22 <1.5 && $22 >0.5 && $23 <1.5 && $23 >0.5) {print $1,$2,$19, $20, $21,$14,$15,$16}' |\
+awk -v p=$p_value 'BEGIN{OFS="\t"} ($8 <p) {print $1,$2,$3, $4, $5, $6}; ($8 >=p){print $1,$2,$3, $4, $5, "S"}' >> counts_hmm.txt 
 
 
 #use for hmm prediction
 #combine chromosone
 head ${Input_counts_plus} -n 1 |awk 'BEGIN{OFS="\t"} {print $1,$2,$19, $20, $21, "state"}' > counts_plus_hmm.txt 
 cat ${Input_counts_plus} |\
-awk 'BEGIN{OFS="\t"} ($18 <1.5 && $18 >0.5) {print $1,$2,$19, $20, $21,$14,$15,$16}' |\
-awk 'BEGIN{OFS="\t"} ($8 <0.038) {print $1,$2,$3, $4, $5, $6}; ($8 >=0.038){print $1,$2,$3, $4, $5, "S"}' >> counts_plus_hmm.txt 
+awk 'BEGIN{OFS="\t"} ($22 <1.5 && $22 >0.5 && $23 <1.5 && $23 >0.5) {print $1,$2,$19, $20, $21,$14,$15,$16}' |\
+awk -v p=$p_value 'BEGIN{OFS="\t"} ($8 <p) {print $1,$2,$3, $4, $5, $6}; ($8 >=p){print $1,$2,$3, $4, $5, "S"}' >> counts_plus_hmm.txt 
 
 head ${Input_counts_minus} -n 1 |awk 'BEGIN{OFS="\t"} {print $1,$2,$19, $20, $21, "state"}' > counts_minus_hmm.txt 
 cat ${Input_counts_minus} |\
-awk 'BEGIN{OFS="\t"} ($18 <1.5 && $18 >0.5) {print $1,$2,$19, $20, $21,$14,$15,$16}' |\
-awk 'BEGIN{OFS="\t"} ($8 <0.038) {print $1,$2,$3, $4, $5, $6}; ($8 >=0.038){print $1,$2,$3, $4, $5, "S"}' >> counts_minus_hmm.txt 
+awk 'BEGIN{OFS="\t"} ($22 <1.5 && $22 >0.5 && $23 <1.5 && $23 >0.5) {print $1,$2,$19, $20, $21,$14,$15,$16}' |\
+awk -v p=$p_value 'BEGIN{OFS="\t"} ($8 <p) {print $1,$2,$3, $4, $5, $6}; ($8 >=p){print $1,$2,$3, $4, $5, "S"}' >> counts_minus_hmm.txt 
 
 
 #// # not used
