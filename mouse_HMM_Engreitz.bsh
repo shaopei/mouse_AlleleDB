@@ -17,14 +17,16 @@ R --vanilla --slave --args $(pwd) counts_minus_noX.txt ${Min_count} ${Max_Pvalus
 Input_counts_plus=counts_plus_noX_MinCount${Min_count}_MaxPvalue${Max_Pvalus}.txt
 Input_counts_minus=counts_minus_noX_MinCount${Min_count}_MaxPvalue${Max_Pvalus}.txt
 
+
 ####
 # add CNV from both CAST and 129S1
-cnv_1=/workdir/sc2457/mouse_AlleleSpecific/mouse_genome.sanger.ac.uk/working/PersonalGenome_P.CAST_M.129S1_indelsNsnps_CAST.subsample.bam/P.CAST_M.129S1_indelsNsnps_CAST.subsample.bam.alleleSeqInput.cnv
-cnv_2=/workdir/sc2457/mouse_AlleleSpecific/mouse_genome.sanger.ac.uk/working/PersonalGenome_P.CAST_M.129S1_indelsNsnps_129S1.subsample.bam/P.CAST_M.129S1_indelsNsnps_129S1.subsample.bam.alleleSeqInput.cnv
-cat ${cnv_1}| grep -v X | awk 'BEGIN{OFS="\t"; t="_"} {print $1t$2,$0}'| LC_ALL=C  sort -k1  --parallel=30 > cnv_1
-cat ${cnv_2}| grep -v X | awk 'BEGIN{OFS="\t"; t="_"} {print $1t$2,$0}'| LC_ALL=C  sort -k1  --parallel=30  > cnv_2
-LC_ALL=C join -t $'\t' -j 1 -o 1.1,1.2,1.3,1.4,2.4 cnv_1 cnv_2 > cnv_both
-
+#cnv_1=/workdir/sc2457/mouse_AlleleSpecific/mouse_genome.sanger.ac.uk/working/PersonalGenome_P.CAST_M.129S1_indelsNsnps_CAST.subsample.bam/P.CAST_M.129S1_indelsNsnps_CAST.subsample.bam.alleleSeqInput.cnv
+#cnv_2=/workdir/sc2457/mouse_AlleleSpecific/mouse_genome.sanger.ac.uk/working/PersonalGenome_P.CAST_M.129S1_indelsNsnps_129S1.subsample.bam/P.CAST_M.129S1_indelsNsnps_129S1.subsample.bam.alleleSeqInput.cnv
+#cat ${cnv_1}| grep -v X | awk 'BEGIN{OFS="\t"; t="_"} {print $1t$2,$0}'| LC_ALL=C  sort -k1  --parallel=30 > cnv_1
+#cat ${cnv_2}| grep -v X | awk 'BEGIN{OFS="\t"; t="_"} {print $1t$2,$0}'| LC_ALL=C  sort -k1  --parallel=30  > cnv_2
+#LC_ALL=C join -t $'\t' -j 1 -o 1.1,1.2,1.3,1.4,2.4 cnv_1 cnv_2 > cnv_both
+#rm cnv_1 cnv_2
+ln -s ../P.CAST_M.129S1_cnv cnv_both
 
 cat ${Input_counts_plus}| awk 'BEGIN{OFS="\t"; t="_"} (NR >1){print $1t$2,$0}'| LC_ALL=C  sort -k1  --parallel=30 > temp_plus
 head -n 1 ${Input_counts_plus} | awk 'BEGIN{OFS="\t"} {print $0, "cnv1", "cnv2"}' > ${Input_counts_plus}_cnv
@@ -34,7 +36,7 @@ cat ${Input_counts_minus}| awk 'BEGIN{OFS="\t"; t="_"} (NR >1){print $1t$2,$0}'|
 head -n 1 ${Input_counts_minus} | awk 'BEGIN{OFS="\t"} {print $0, "cnv1", "cnv2"}' > ${Input_counts_minus}_cnv
 LC_ALL=C join -t $'\t' -j 1 -o 1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,1.10,1.11,1.12,1.13,1.14,1.15,1.16,1.17,1.18,1.19,1.20,1.21,1.22,2.4,2.5 temp_plus cnv_both |LC_ALL=C  sort -k1,1n -k2,2n  --parallel=30>>${Input_counts_minus}_cnv
 
-rm cnv_1 cnv_2 temp_plus temp_minus
+rm  temp_plus temp_minus
 mv ${Input_counts_plus}_cnv ${Input_counts_plus}
 mv ${Input_counts_minus}_cnv ${Input_counts_minus}
 
@@ -43,7 +45,6 @@ mv ${Input_counts_minus}_cnv ${Input_counts_minus}
 # $22, $23 0.5 <= CNV <= 1.5
 # use for hmm training
 p_value=0.05
-awk -v var="$variable"
 
 head ${Input_counts_plus} -n 1 |awk 'BEGIN{OFS="\t"} {print $1,$2,$19, $20, $21, "state"}' > counts_hmm.txt 
 cat ${Input_counts_plus} | \
@@ -66,13 +67,13 @@ cat ${Input_counts_minus} |\
 awk 'BEGIN{OFS="\t"} ($22 <1.5 && $22 >0.5 && $23 <1.5 && $23 >0.5) {print $1,$2,$19, $20, $21,$14,$15,$16}' |\
 awk -v p=$p_value 'BEGIN{OFS="\t"} ($8 <p) {print $1,$2,$3, $4, $5, $6}; ($8 >=p){print $1,$2,$3, $4, $5, "S"}' >> counts_minus_hmm.txt 
 
-
 # run hmm
 mkdir AlleleHMM
 cd AlleleHMM
 ln -s ../counts*hmm.txt . 
 ln -s /workdir/sc2457/mouse_AlleleSpecific/allelicbias-PersonalGenome_P.CAST_M.B6-LEP_ZYG_ATGCA_forAlleleDB/Tm_Tp_fixed_redo/hmm_spc.py .
-python hmm_spc.py counts_hmm.txt counts_plus_hmm.txt counts_minus_hmm.txt 19 #predict
+python hmm_spc.py counts_hmm.txt counts_plus_hmm.txt counts_minus_hmm.txt 19 predict
+
 
 #// # not used
 #// # $18 0.5 <= CNV <= 1.5
@@ -89,12 +90,12 @@ python hmm_spc.py counts_hmm.txt counts_plus_hmm.txt counts_minus_hmm.txt 19 #pr
 ##
 PL=/workdir/sc2457/alleleDB/alleledb_pipeline_mouse
 MAPS=/workdir/sc2457/mouse_AlleleSpecific/mouse_genome.sanger.ac.uk/REL-1505-SNPs_Indels/PersonalGenome_P.CAST_M.129S1_indelsNsnps_CAST.subsample.bam/%s_P.CAST.EiJ_M.129S1.SvImJ.map
-PREFIX=SRR4041367_dedup_2
+PREFIX=SRR4041366_dedup_2
 MATBOWTIE=${PREFIX}.mat.bowtie
 PATBOWTIE=${PREFIX}.pat.bowtie
 FDR_SIMS=10
 FDR_CUTOFF=0.1
-MyWorkDir=/workdir/sc2457/mouse_AlleleSpecific/allelicbias-PersonalGenome_P.CAST_M.129S1-SRR4041367_dedup_2
+MyWorkDir=/workdir/sc2457/mouse_AlleleSpecific/allelicbias-PersonalGenome_P.CAST_M.129S1-${PREFIX}
 unfiltered_snp=/workdir/sc2457/mouse_AlleleSpecific/mouse_genome.sanger.ac.uk/REL-1505-SNPs_Indels/PersonalGenome_P.CAST_M.129S1_indelsNsnps_CAST.subsample.bam/P.CAST_M.129S1_indelsNsnps_CAST.subsample.bam.snp.unfiltered
 
 # remove AMB reads and sort by index
@@ -105,6 +106,7 @@ python ${PL}/filter_reads_out.py ${MATBOWTIE} - originalmatpatreads.toremove.ids
 # order matters! ${PATBOWTIE}_AMBremoved_sorted need to be in front of ${MATBOWTIE}_AMBremoved_sorted !!!
 python ${PL}/seperate_mat_pat_reads_withSNPs.py ${PATBOWTIE}_AMBremoved_sorted ${MATBOWTIE}_AMBremoved_sorted ${MAPS}
 # output is ${PATBOWTIE}_AMBremoved_sorted_specific.bowtie ${PATBOWTIE}_AMBremoved_sorted_identical.bowtie ${MATBOWTIE}_AMBremoved_sorted_specific.bowtie ${MAPS}
+
 
 
 #bowtie to bed
@@ -139,17 +141,14 @@ wait
 
 # liftOver to reference genome
 # usage: liftOver oldFile map.chain newFile unMapped
-cp 2-map.back.ref-SRR4041367_dedup_2/mat2ref.chain .
-cp 2-map.back.ref-SRR4041367_dedup_2/pat2ref.chain .
+cp 2-map.back.ref-${PREFIX}/mat2ref.chain .
+cp 2-map.back.ref-${PREFIX}/pat2ref.chain .
 liftOver ${MATBOWTIE}_AMBremoved_sorted_specific.bed mat2ref.chain  ${MATBOWTIE}_AMBremoved_sorted_specific.map2ref.bed ${MATBOWTIE}_AMBremoved_sorted_specific.unmap2ref.log
 liftOver ${PATBOWTIE}_AMBremoved_sorted_specific.bed pat2ref.chain  ${PATBOWTIE}_AMBremoved_sorted_specific.map2ref.bed ${PATBOWTIE}_AMBremoved_sorted_specific.unmap2ref.log
 liftOver ${PATBOWTIE}_AMBremoved_sorted_identical.bed pat2ref.chain  ${PATBOWTIE}_AMBremoved_sorted_identical.map2ref.bed ${PATBOWTIE}_AMBremoved_sorted_identical.unmap2ref.log
 rm mat2ref.chain pat2ref.chain
 
 LC_ALL=C sort -k1,1V -k2,2n --parallel=30 ${PATBOWTIE}_AMBremoved_sorted_identical.map2ref.bed > ${PATBOWTIE}_AMBremoved_sorted_identical.map2ref.sorted.bed
-mkdir toremove
-mv ${PATBOWTIE}_AMBremoved_sorted_skipped.bowtie ${MATBOWTIE}_AMBremoved_sorted_specific.bowtie ${PATBOWTIE}_AMBremoved_sorted_specific.bowtie ${PATBOWTIE}_AMBremoved_sorted_identical.bowtie toremove/.
-mv ${MATBOWTIE}_AMBremoved_sorted_specific.bed ${PATBOWTIE}_AMBremoved_sorted_specific.bed ${PATBOWTIE}_AMBremoved_sorted_identical.bed ${PATBOWTIE}_AMBremoved_sorted_identical.map2ref.bed toremove/.
 
 # remove reads that DONOT overlape with a SNP in ${PATBOWTIE}_AMBremoved_sorted_specific.map2ref.sorted.bed and  ${MATBOWTIE}_AMBremoved_sorted_specific.map2ref.sorted.bed 
 for f in *_AMBremoved_sorted_specific.map2ref.bed;
@@ -158,8 +157,95 @@ j=`echo $f|rev| cut -d \. -f 2-|rev`
 intersectBed -sorted -u -a <(LC_ALL=C sort -k1,1V -k2,2n --parallel=30 $f) \
 -b <(cat ${unfiltered_snp} |awk '{OFS="\t"}{print $1, $2-1, $2, $6 }') > ${j}.sorted.bed 
 done
-#WE are HERE
+mkdir toremove
+mv ${PATBOWTIE}_AMBremoved_sorted_skipped.bowtie ${MATBOWTIE}_AMBremoved_sorted_specific.bowtie ${PATBOWTIE}_AMBremoved_sorted_specific.bowtie ${PATBOWTIE}_AMBremoved_sorted_identical.bowtie toremove/.
+mv ${MATBOWTIE}_AMBremoved_sorted_specific.bed ${PATBOWTIE}_AMBremoved_sorted_specific.bed ${PATBOWTIE}_AMBremoved_sorted_identical.bed ${PATBOWTIE}_AMBremoved_sorted_identical.map2ref.bed toremove/.
+mv ${MATBOWTIE}_AMBremoved_sorted_specific.map2ref.bed ${PATBOWTIE}_AMBremoved_sorted_specific.map2ref.bed toremove/.
+mv ${MATBOWTIE}_AMBremoved_sorted ${PATBOWTIE}_AMBremoved_sorted toremove/.
+mv ${PREFIX}.merged.bowtie* toremove/.
+gzip *.bed
+
+
+
 #
+
+cd ${MyWorkDir}
+cd AlleleHMM
+ln -s ../${PATBOWTIE}_AMBremoved_sorted_specific.map2ref.sorted.bed.gz .
+ln -s ../${MATBOWTIE}_AMBremoved_sorted_specific.map2ref.sorted.bed.gz .
+ln -s ../${PATBOWTIE}_AMBremoved_sorted_identical.map2ref.sorted.bed.gz .
+ln -s /workdir/sc2457/mouse_AlleleSpecific/scriptsForAlleleHMM/sum_of_counts.py .
+ln -s /workdir/sc2457/mouse_AlleleSpecific/scriptsForAlleleHMM/getFractionOfBlock_DistanceToNearestSites.R .
+
+#SRR4041365_dedup_2 here
+#SRR4041366_dedup_2 here
+### counts the maternal, paternal reads, and the reads that cannot tell where it from, in the regions of hmm predictions
+# perform BinomialTest and filter by FDR<= FDR_CUTOFF
+for f in counts_*_hmm_regions_t*.bed;
+  do j=`echo $f| rev | cut -d \. -f 2- |rev`
+bedtools coverage -a $f -b <(zcat ${MATBOWTIE}_AMBremoved_sorted_specific.map2ref.sorted.bed.gz) -s | awk 'BEGIN {OFS="\t"; t="_"} {print $1t$2t$3, $0}' |LC_ALL=C sort -k1,1 --parallel=30 > ${j}.mat_cov.bed &
+bedtools coverage -a $f -b <(zcat ${PATBOWTIE}_AMBremoved_sorted_specific.map2ref.sorted.bed.gz) -s | awk 'BEGIN {OFS="\t"; t="_"} {print $1t$2t$3, $0}' |LC_ALL=C sort -k1,1 --parallel=30 > ${j}.pat_cov.bed &
+wait
+join -t $'\t' -j 1 -o 1.1,1.2,1.3,1.4,1.5,1.8,2.8 ${j}.mat_cov.bed ${j}.pat_cov.bed > ${j}.temp_cov.bed &
+bedtools coverage -a $f -b <(zcat ${PATBOWTIE}_AMBremoved_sorted_identical.map2ref.sorted.bed.gz) -s | awk 'BEGIN {OFS="\t"; t="_"} {print $1t$2t$3, $0}' |LC_ALL=C sort -k1,1 --parallel=30 > ${j}.iden_cov.bed &
+wait
+join -t $'\t' -j 1 -o 1.2,1.3,1.4,1.5,1.6,1.7,2.8 ${j}.temp_cov.bed ${j}.iden_cov.bed | LC_ALL=C sort -k1,1n -k2,2n --parallel=30 > ${j}.merged_cov.bed
+rm ${j}.temp_cov.bed ${j}.mat_cov.bed ${j}.pat_cov.bed ${j}.iden_cov.bed
+python ${PL}/BinomialTestFor_merged_cov.bed.py ${j}.merged_cov.bed ${j}.merged_cov_binomtest.bed
+rm ${j}.merged_cov.bed
+# output of BinomialTestFor_merged_cov.bed.py:(hmm+BinomialTest) if p-value <= 0.05, remain what it got from hmm (can ne M,P, or S), otherwise S.
+python ${PL}/FalsePosFor_merged_cov.bed.py ${j}.merged_cov_binomtest.bed ${FDR_SIMS} ${FDR_CUTOFF} > ${j}.merged_cov_binomtest_FDR.txt
+awk 'NR==1 { print $0 } NR>1 && $9 <= thresh { print $0 }'  thresh=$(awk 'END {print $6}' ${j}.merged_cov_binomtest_FDR.txt) < ${j}.merged_cov_binomtest.bed > ${j}_interestingHets.bed
+done
+
+#SRR4041367_dedup_2 is HERE
+#SRR4041367_dedup_2_and_RC1 here
+
+# examine how many hmm_state M or P becaome S after binomial test
+for f in counts_*_hmm_regions_t*.merged_cov_binomtest.bed;
+  do echo $f
+  cat ${f} | awk ' $4 != "S" {print $0}' |wc -l
+  cat ${f} | awk ' $4 != "S" && $4==$5 {print $0}' |wc -l
+  cat ${f} | awk ' $4 != "S" && $4!=$5 {print $0}' |wc -l
+done
+
+
+
+
+
+
+
+
+
+
+
+#ln -s ../LEP_ZYG_ATGCA.dREG.peak.score.bed.gz .
+
+
+#dREG_peak_score=out.dREG.peak.full.bed.gz
+#dREG_peak_score_plus=tss_paired_LEP_ZYG_ATGCA_dREG_plus.bed
+#dREG_peak_score_minus=tss_paired_LEP_ZYG_ATGCA_dREG_minus.bed
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 ##### see mouse_after_HMM_forGenome_browser.bsh for update! ####
