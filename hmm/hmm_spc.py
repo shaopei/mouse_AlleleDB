@@ -370,7 +370,7 @@ def prediction():
         print i
         T=[]
         for ll in l[0:3]:
-            for lll in ll.strip().strip('T=').strip('[').strip(']').split(" "):
+            for lll in ll.strip().strip('T=').strip('[').strip(']').split():
                 print lll
                 T.append(float(lll))
             print T
