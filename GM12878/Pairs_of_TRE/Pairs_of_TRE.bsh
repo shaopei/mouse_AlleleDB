@@ -97,6 +97,7 @@ cat counts_plus_hmm_regions_t1e-05_interestingHets_IGV.bed  counts_minus_hmm_reg
 use R to fit the line
 
 #4173 counts_both_hmm_regions_t1e-05_interestingHets_IGV.bed
+# GM12878
 D=20000
 bedtools cluster -i counts_both_hmm_regions_t1e-05_interestingHets_IGV.bed -d $D > counts_both_hmm_regions_t1e-05_interestingHets_IGV_clusterBy${D}bp.bed
 # 2676 cluster
@@ -241,4 +242,5 @@ bedtools intersect -a <(zcat out.dREG.peak.full.bed.gz) -b counts_minus_hmm_regi
 
 bedtools intersect -a <(zcat out.dREG.peak.full.bed.gz) -b counts_both_hmm_regions_t1e-05_interestingHets_IGV_clusterBy10000bp.bed -wb |awk '{OFS="\t"}{print $1, $2, $3, $13, $14, $15, $16}' >counts_both_hmm_regions_t1e-05_interestingHets_IGV_clusterBy10000bp_dReg.bed
 cat counts_both_hmm_regions_t1e-05_interestingHets_IGV_clusterBy10000bp_dReg.bed| cut -f 7 |uniq -c |awk '{print $1}' |sort -n |uniq -c
+
 
