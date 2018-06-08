@@ -34,7 +34,7 @@ LC_ALL=C join -t $'\t' -j 1 -o 1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,1.10,1.11,1.12,1.
 
 cat ${Input_counts_minus}| awk 'BEGIN{OFS="\t"; t="_"} (NR >1){print $1t$2,$0}'| LC_ALL=C  sort -k1  --parallel=30 > temp_minus
 head -n 1 ${Input_counts_minus} | awk 'BEGIN{OFS="\t"} {print $0, "cnv1", "cnv2"}' > ${Input_counts_minus}_cnv
-LC_ALL=C join -t $'\t' -j 1 -o 1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,1.10,1.11,1.12,1.13,1.14,1.15,1.16,1.17,1.18,1.19,1.20,1.21,1.22,2.4,2.5 temp_plus cnv_both |LC_ALL=C  sort -k1,1n -k2,2n  --parallel=30>>${Input_counts_minus}_cnv
+LC_ALL=C join -t $'\t' -j 1 -o 1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,1.10,1.11,1.12,1.13,1.14,1.15,1.16,1.17,1.18,1.19,1.20,1.21,1.22,2.4,2.5 temp_minus cnv_both |LC_ALL=C  sort -k1,1n -k2,2n  --parallel=30>>${Input_counts_minus}_cnv
 
 rm  temp_plus temp_minus
 mv ${Input_counts_plus}_cnv ${Input_counts_plus}
@@ -67,6 +67,9 @@ cat ${Input_counts_minus} |\
 awk 'BEGIN{OFS="\t"} ($22 <1.5 && $22 >0.5 && $23 <1.5 && $23 >0.5) {print $1,$2,$19, $20, $21,$14,$15,$16}' |\
 awk -v p=$p_value 'BEGIN{OFS="\t"} ($8 <p) {print $1,$2,$3, $4, $5, $6}; ($8 >=p){print $1,$2,$3, $4, $5, "S"}' >> counts_minus_hmm.txt 
 
+
+
+
 # run hmm
 mkdir AlleleHMM
 cd AlleleHMM
@@ -74,7 +77,10 @@ ln -s ../counts*hmm.txt .
 ln -s /workdir/sc2457/mouse_AlleleSpecific/allelicbias-PersonalGenome_P.CAST_M.B6-LEP_ZYG_ATGCA_forAlleleDB/Tm_Tp_fixed_redo/hmm_spc.py .
 python hmm_spc.py counts_hmm.txt counts_plus_hmm.txt counts_minus_hmm.txt 19 predict
 
-
+#SRR4041367_dedup_2 is HERE
+#SRR4041366_dedup_2 is HERE
+#SRR4041365_dedup_2 is HERE
+#SRR4041367_dedup_2_and_RC1 is HERE
 #// # not used
 #// # $18 0.5 <= CNV <= 1.5
 #// # only chromosone 1
@@ -90,7 +96,7 @@ python hmm_spc.py counts_hmm.txt counts_plus_hmm.txt counts_minus_hmm.txt 19 pre
 ##
 PL=/workdir/sc2457/alleleDB/alleledb_pipeline_mouse
 MAPS=/workdir/sc2457/mouse_AlleleSpecific/mouse_genome.sanger.ac.uk/REL-1505-SNPs_Indels/PersonalGenome_P.CAST_M.129S1_indelsNsnps_CAST.subsample.bam/%s_P.CAST.EiJ_M.129S1.SvImJ.map
-PREFIX=SRR4041366_dedup_2
+PREFIX=SRR4041367_dedup_2
 MATBOWTIE=${PREFIX}.mat.bowtie
 PATBOWTIE=${PREFIX}.pat.bowtie
 FDR_SIMS=10
@@ -167,7 +173,7 @@ gzip *.bed
 
 
 
-#
+### perfrom binomial test in the HMM blocks using Allele-specfic reads
 
 cd ${MyWorkDir}
 cd AlleleHMM
@@ -177,8 +183,8 @@ ln -s ../${PATBOWTIE}_AMBremoved_sorted_identical.map2ref.sorted.bed.gz .
 ln -s /workdir/sc2457/mouse_AlleleSpecific/scriptsForAlleleHMM/sum_of_counts.py .
 ln -s /workdir/sc2457/mouse_AlleleSpecific/scriptsForAlleleHMM/getFractionOfBlock_DistanceToNearestSites.R .
 
-#SRR4041365_dedup_2 here
-#SRR4041366_dedup_2 here
+
+
 ### counts the maternal, paternal reads, and the reads that cannot tell where it from, in the regions of hmm predictions
 # perform BinomialTest and filter by FDR<= FDR_CUTOFF
 for f in counts_*_hmm_regions_t*.bed;
@@ -193,21 +199,67 @@ join -t $'\t' -j 1 -o 1.2,1.3,1.4,1.5,1.6,1.7,2.8 ${j}.temp_cov.bed ${j}.iden_co
 rm ${j}.temp_cov.bed ${j}.mat_cov.bed ${j}.pat_cov.bed ${j}.iden_cov.bed
 python ${PL}/BinomialTestFor_merged_cov.bed.py ${j}.merged_cov.bed ${j}.merged_cov_binomtest.bed
 rm ${j}.merged_cov.bed
-# output of BinomialTestFor_merged_cov.bed.py:(hmm+BinomialTest) if p-value <= 0.05, remain what it got from hmm (can ne M,P, or S), otherwise S.
+# output of BinomialTestFor_merged_cov.bed.py:(hmm+BinomialTest) if p-value <= 0.05, remain what it got from hmm (can be M,P, or S), otherwise S.
 python ${PL}/FalsePosFor_merged_cov.bed.py ${j}.merged_cov_binomtest.bed ${FDR_SIMS} ${FDR_CUTOFF} > ${j}.merged_cov_binomtest_FDR.txt
 awk 'NR==1 { print $0 } NR>1 && $9 <= thresh { print $0 }'  thresh=$(awk 'END {print $6}' ${j}.merged_cov_binomtest_FDR.txt) < ${j}.merged_cov_binomtest.bed > ${j}_interestingHets.bed
 done
 
 #SRR4041367_dedup_2 is HERE
+#SRR4041366_dedup_2 here
+#SRR4041365_dedup_2 here
 #SRR4041367_dedup_2_and_RC1 here
 
 # examine how many hmm_state M or P becaome S after binomial test
 for f in counts_*_hmm_regions_t*.merged_cov_binomtest.bed;
   do echo $f
-  cat ${f} | awk ' $4 != "S" {print $0}' |wc -l
-  cat ${f} | awk ' $4 != "S" && $4==$5 {print $0}' |wc -l
-  cat ${f} | awk ' $4 != "S" && $4!=$5 {print $0}' |wc -l
+  cat ${f} | awk ' NR>1 && $4 != "S" {print $0}' |wc -l  #hmm allele biased
+  cat ${f} | awk ' NR>1 && $4 != "S" && $4==$5 {print $0}' |wc -l  #hmm allele-biased and pass binomila test
+  cat ${f} | awk ' NR>1 && $4 != "S" && $4!=$5 {print $0}' |wc -l  #hmm allele-biased and NOT pass binomila test
 done
+
+
+
+### make plot to see how the FractionOfBlock_DistanceToNearestSites vary with t ###
+cd ${MyWorkDir}
+cd AlleleHMM
+PREFIX_head=`echo ${PREFIX}|cut -d _ -f 1`
+ln -s ../../${PREFIX_head}.dREG.peak.score.bed.gz .
+
+
+### make bed with only the 5prime head reads
+for f in counts_*_hmm_regions_t*_interestingHets.bed;
+  do echo $f
+j=`echo $f| rev | cut -d \. -f 2- |rev |cut -d _ -f 3-`
+strand=`echo $f|cut -d _ -f 2`
+echo $strand $j
+# filter and only keep M and P, use the state from hmm(hmm_state, Not hmm+BinomialTest ), which binomial test pass FDR <0.1
+if [ ${strand} == "minus" ]
+then cat counts_minus_${j}.bed | awk 'BEGIN {OFS="\t"; t=","; s="-";c="chr"} NR==1 { print $1,$2,$3,$4t$6t$7, 111, s} 
+NR>1 && $4!="S" {print c$1,$3-1,$3,$4t$6t$7, 111, s}' > counts_${j}_5head.bed
+else
+cat counts_plus_${j}.bed | awk 'BEGIN {OFS="\t"; t=","; s="+";c="chr"} NR==1 { print $1,$2,$3,$4t$6t$7, 111, s} 
+NR>1 && $4!="S"  {print c$1,$2,$2+1,$4t$6t$7, 111, s}' >> counts_${j}_5head.bed
+fi
+
+# distance to the closet upstream dReg sites.
+# -d report its distance to A as an extra column.
+# -D a Report distance with respect to A.
+# -id Ignore features in B that are downstream of features in A. 
+# check both end, no id
+
+bedtools closest -d -a <(cat counts_${j}_5head.bed | awk 'BEGIN {OFS="\t"} NR!=1 {print $0}' | LC_ALL=C sort -k1,1 -k2,2n --parallel=30) -b ${PREFIX_head}.dREG.peak.score.bed.gz \
+|awk '{print $11}' | LC_ALL=C sort --temporary-directory=/workdir/sc2457/tmp/ --parallel=10 -n | uniq -c >  counts_${j}_5head_distance_toclosest-dReg_Counts.txt
+python sum_of_counts.py counts_${j}_5head_distance_toclosest-dReg_Counts.txt `awk 'END {print $2}' counts_${j}_5head_distance_toclosest-dReg_Counts.txt` > counts_${j}_5head_distance_toclosest-dReg_AccumulateCounts.txt 
+
+done
+
+
+### make figures
+R --vanilla --slave --args $(pwd) "counts_hmm_regions_t*_interestingHets_5head_distance_toclosest-dReg_AccumulateCounts.txt" counts_hmm_regions_tX_interestingHets_5head_distance_toclosest-dReg_AccumulateCounts.pdf counts_hmm_regions_tX_interestingHets_5head_distance_toclosest-dReg_At5Kb.pdf < getFractionOfBlock_DistanceToNearestSites.R
+
+
+
+
 
 
 
