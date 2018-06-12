@@ -307,7 +307,7 @@ def run_em_T_mp_fixed(t):
     p_Y_f_list = [p_Y_f]
     new_T_list = [new_T]
     new_P_list = [new_P]
-    max_iter = 70
+    max_iter = 30
     for i in xrange(max_iter):
         print i
         new_T, new_P, p_Y_f = em_interate_T_mp_fixed(new_T, new_P, x=mat, n=total)
@@ -315,7 +315,7 @@ def run_em_T_mp_fixed(t):
         new_T_list.append(new_T)
         new_P_list.append(new_P)
     make_em_plot(p_Y_f_list,"count_min=1 Tmx, Tpx fixed, t="+str(t)+", Tsx allow change for EM", f_int[0:-4]+"_em_p_Y_f_list_plot_count_min=1_Tmpfixed_t="+str(t)+".pdf")
-    make_em_plot(p_Y_f_list, "count_min=1 Tmx, Tpx fixed, t="+str(t)+", Tsx allow change for EM", f_int[0:-4]+"_em_p_Y_f_list_plot_count_min=1_Tmpfixed_t="+str(t)+"_50.pdf" ,50)
+    make_em_plot(p_Y_f_list, "count_min=1 Tmx, Tpx fixed, t="+str(t)+", Tsx allow change for EM", f_int[0:-4]+"_em_p_Y_f_list_plot_count_min=1_Tmpfixed_t="+str(t)+"_15.pdf" ,15)
     with open(f_int[0:-4]+"_t="+str(t)+'_parameters.txt', 'w') as out:
         out.write("T="+str(new_T_list[-1])+"\n")
         out.write("P="+str(new_P_list[-1])+"\n")
