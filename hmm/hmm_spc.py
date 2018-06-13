@@ -219,7 +219,7 @@ def em_interate_T_mp_fixed(T, p, x=mat, n=total, update_state=1):
     for k in range(3):
         new_P[k] = np.sum(np.exp(f_p_m[k,] + b_p_m[k,]-p_Y_l) * x ) / np.sum(np.exp(f_p_m[k,] + b_p_m[k,]-p_Y_l) * n ) 
     new_T = np.exp(T)
-    k = update_state
+    #k = update_state
     new_T[k] = A[k]/A[k].sum()
     #new_p_Y_f = forward_probability_calculation(p= new_P, T=np.log(new_T))[1]
     print "secs: ", t- time.time()
