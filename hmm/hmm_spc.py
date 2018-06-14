@@ -187,6 +187,11 @@ def em_interate(T, p, x=mat, n=total):
     for k in range(3):
         new_P[k] = np.sum(np.exp(f_p_m[k,] + b_p_m[k,]-p_Y_l) * x ) / np.sum(np.exp(f_p_m[k,] + b_p_m[k,]-p_Y_l) * n ) 
         new_T[k] = A[k]/A[k].sum()
+    # adjust so that p_m + p_p = 1
+    p0=new_P[0]
+    p2=new_P[2]
+    new_P[0]= (p0+1-p2)/2.0
+    new_P[2]= (p2+1-p0)/2.0
     #new_p_Y_f = forward_probability_calculation(p= new_P, T=np.log(new_T))[1]
     print "secs: ", t- time.time()
     print new_T, new_P, p_Y_f
