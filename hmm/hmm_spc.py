@@ -223,6 +223,12 @@ def em_interate_T_mp_fixed(T, p, x=mat, n=total, update_state=1):
     print "A : ", t- time.time()
     for k in range(3):
         new_P[k] = np.sum(np.exp(f_p_m[k,] + b_p_m[k,]-p_Y_l) * x ) / np.sum(np.exp(f_p_m[k,] + b_p_m[k,]-p_Y_l) * n ) 
+    # adjust so that p_m + p_p = 1
+    p0=new_P[0]
+    p2=new_P[2]
+    new_P[0]= (p0+1-p2)/2.0
+    new_P[2]= (p2+1-p0)/2.0
+    
     new_T = np.exp(T)
     k = update_state
     new_T[k] = A[k]/A[k].sum()
