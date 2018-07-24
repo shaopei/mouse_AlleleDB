@@ -374,13 +374,6 @@ Gene_bed=gencode.v28lift37.annotation_geneMerged.bed
 intersectBed -sorted -a ${Gene_bed} -b counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed -s -wb| cut -f 7-10 |uniq -c > counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV_genePerBlock.txt
 intersectBed -sorted -a ${Gene_bed} -b counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed -s -wb| cut -f 7-10 |uniq -c > counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV_genePerBlock.txt
 
-### how many genes in the HMM blocks? (inclding partial gene, multiple count of overlappping genes)
-##GM12878
-ln -s /workdir/sc2457/gencode/hg19_GRCh37/hg19_gencode.v28lift37.bed .
-intersectBed -sorted -u -a hg19_gencode.v28lift37.bed -b counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed -s|wc -l
-2720
-intersectBed -sorted -u -a hg19_gencode.v28lift37.bed -b counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed -s|wc -l
-2335
 
 
 
