@@ -59,6 +59,14 @@ while test $# -gt 0; do
 
                         exit 0
                         ;;
+                -SE)
+                        export SEQ="SE"
+                        shift
+                        ;;
+                -PE)
+                        export SEQ="PE"
+                        shift
+                        ;;
                 -i)
                         shift
                         if test $# -gt 0; then
@@ -205,13 +213,70 @@ if [ -z "$CHINFO" ]; then
         echo " use bash proseq_PE.bsh --help."
         exit 1
 fi
-if [[ "$FQ_INPUT" == "*.fastq.gz" ]]; then
-  FQ_INPUT=`ls *.fastq.gz | awk -F"/" '{print $NF}' | rev | cut -d \. -f 3-| cut -d _ -f 2- |rev | sort | uniq`
+if [ -z "$SEQ" ]; then
+  echo "Please specify the input data is SE or PE."
+  echo " use bash proseq_PE.bsh --help."
+  exit 1
 fi
-if [ -z "$FQ_INPUT" ]; then
-	echo "No input files specified.  Using *.fastq.gz"
-	FQ_INPUT=`ls *.fastq.gz | awk -F"/" '{print $NF}' | rev | cut -d \. -f 3-| cut -d _ -f 2- |rev | sort | uniq`
+
+## INPUT
+# PE
+if [[ "$SEQ" == "PE" ]] ; then 
+  if [[ "$FQ_INPUT" == "*.fastq.gz" ]]; then
+    FQ_INPUT=`ls *.fastq.gz | awk -F"/" '{print $NF}' | rev | cut -d \. -f 3-| cut -d _ -f 2- |rev | sort | uniq`
+  fi
+  if [ -z "$FQ_INPUT" ]; then
+    echo "No input files specified.  Using *.fastq.gz"
+    FQ_INPUT=`ls *.fastq.gz | awk -F"/" '{print $NF}' | rev | cut -d \. -f 3-| cut -d _ -f 2- |rev | sort | uniq`
+  fi
+
+  ## Check if input file end with _R1.fastq.gz or _R2.fastq.gz
+  tmp=${FQ_INPUT}
+  FQ_INPUT=() #array
+  for name in ${tmp}
+  do 
+    if [ ! -f ${name}_R1.fastq.gz ]; then
+      echo ""
+      echo "##################################################################################"
+      echo " File ${name}_R1.fastq.gz was not found! Skip ${name}*.fastq.gz from analysis."
+      echo " Paired-end files require identical prefix and end with _R1.fastq.gz and _R2.fastq.gz"
+      echo " eg: PREFIX_R1.fastq.gz, PREFIX_R2.fastq.gz"
+      echo " Please make sure you have the correct file suffix!                           " 
+      echo "##################################################################################"
+      echo ""
+    else
+    FQ_INPUT+=(${name}) # append to the array
+    echo ${FQ_INPUT} 
+    fi
+  done
+
+# SE
+elif [[ "$SEQ" == "SE" ]] ; then
+  if [[ "$FQ_INPUT" == "*.fastq.gz" ]]; then
+    FQ_INPUT=`ls *.fastq.gz | awk -F"/" '{print $NF}' | rev | cut -d \. -f 3-| rev`
+  fi
+  if [ -z "$FQ_INPUT" ]; then
+    echo "No input files specified.  Using *.fastq.gz"
+    FQ_INPUT=`ls *.fastq.gz | awk -F"/" '{print $NF}' | rev | cut -d \. -f 3-| rev`
+  fi
+else
+  echo "Please specify the input data is SE or PE."
+  echo " use bash proseq_PE.bsh --help."
+  exit 1
 fi
+
+
+# Check input file number
+if [[ ${#FQ_INPUT[@]} == 0 ]]; then  # if the length of array is 0
+  echo "##################################################################################"
+  echo " No files is in the correct format."
+  echo " Paired-end files require identical prefix and end with _R1.fastq.gz and _R2.fastq.gz"
+  echo " eg: PREFIX_R1.fastq.gz, PREFIX_R2.fastq.gz"
+  echo " Please make sure you have the correct file suffix! Aborting."
+  echo "##################################################################################"
+  exit 1
+fi
+
 if [ -z "$OUTPUT" ]; then
         echo "No output path specified.  Using ./My_proseqHT_output_dir-date"
         now=$(date +"%m_%d_%Y")
@@ -281,34 +346,7 @@ for tool in cutadapt prinseq-lite.pl bwa samtools bedtools bedGraphToBigWig
 do command -v ${tool} >/dev/null 2>&1 || { echo >&2 ${tool}" is required. Please make sure you can call the bioinformatics tools from your current working directoryb.  Aborting."; exit 1; }
 done
 
-## Check if input file end with _R1.fastq.gz or _R2.fastq.gz
-tmp=${FQ_INPUT}
-FQ_INPUT=()
-for name in ${tmp}
-do 
-  if [ ! -f ${name}_R1.fastq.gz ]; then
-    echo ""
-    echo "##################################################################################"
-    echo " File ${name}_R1.fastq.gz was not found! Skip ${name}*.fastq.gz from analysis."
-    echo " Paired-end files require identical prefix and end with _R1.fastq.gz and _R2.fastq.gz"
-    echo " eg: PREFIX_R1.fastq.gz, PREFIX_R2.fastq.gz"
-    echo " Please make sure you have the correct file suffix!                           " 
-    echo "##################################################################################"
-    echo ""
-  else
-  FQ_INPUT+=(${name})
-  fi
-done
 
-if [[ ${#FQ_INPUT[@]} == 0 ]]; then
-  echo "##################################################################################"
-  echo " No files is in the correct format."
-  echo " Paired-end files require identical prefix and end with _R1.fastq.gz and _R2.fastq.gz"
-  echo " eg: PREFIX_R1.fastq.gz, PREFIX_R2.fastq.gz"
-  echo " Please make sure you have the correct file suffix! Aborting."
-  echo "##################################################################################"
-  exit 1
-fi
 
 # bash generate random 32 character alphanumeric string (upper and lowercase).
 TMPDIR=$TMPDIR/$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
@@ -320,6 +358,7 @@ echo " "
 echo "Input files/ paths:"
 echo "bwa index                 $BWAIDX"
 echo "chromInfo                 $CHINFO"
+echo "SEQ                       $SEQ"
 i=1
 for name in ${FQ_INPUT[@]}
   do echo "input prefix $i            $name"
@@ -349,6 +388,7 @@ echo "number of threads         $thread"
 ## DOIT!
 mkdir ${TMPDIR}
 
+if [[ "$SEQ" == "PE" ]] ; then 
 #############################################
 ## Preprocess data.  Remove adapters.  Trim.
 echo " "
@@ -498,7 +538,7 @@ for f in ${TMPDIR}/*.sort.bam
    #rm ${TMPDIR}/$j.nr.rs.bed.gz ${TMPDIR}/$j.bed.gz ${TMPDIR}/$j*.bedGraph
  done
 
-
+fi
 #############################################
 ## CLEANUP!
 #rm -Rf ${TMPDIR}
