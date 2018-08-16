@@ -594,14 +594,14 @@ wait
 #rm -r ${TMPDIR}/noadapt 
 gzip ${TMPDIR}/nodups/*.fastq 
 
-#*/
+
 #############################################
 ## Align reads.
 echo " "
 echo "Mapping reads:"
 
-QC_INPUT=`ls  ${TMPDIR}/nodups/*_dedup_end_1.fastq.gz | awk -F"/" '{print $NF}' | rev | cut -d \. -f 2- | cut -d _ -f2- | rev| sort | uniq`
-#*/
+QC_INPUT=`ls  ${TMPDIR}/nodups/*_dedup_end.fastq.gz | awk -F"/" '{print $NF}' | rev | cut -d \. -f 2- | cut -d _ -f2- | rev| sort | uniq`
+
 if [[ ${#QC_INPUT} == 0 ]]; then
   echo "#########################################"
   echo " Something went wrong with Preprocess."
@@ -614,11 +614,18 @@ fi
 for name in ${QC_INPUT}
  do
   ## Align using BWA.
-  bwa mem -k 19 -t ${thread} ${BWAIDX} ${TMPDIR}/nodups/${name}_1.fastq.gz ${TMPDIR}/nodups/${name}_2.fastq.gz | \
-  samtools view -bf 0x2 -q 10 - | samtools sort -n -@ ${thread} - > ${TMPDIR}/${name}.sort.bam
-    
-  cp ${TMPDIR}/${name}.sort.bam ${OUTPUT} ## Saves the sorted BAM in the output file.
+  #bwa aln ref.fa short_read.fq > aln_sa.sai
+  bwa aln -t ${thread} ${BWAIDX}  ${TMPDIR}/nodups/${name}_end.fastq.gz > ${TMPDIR}/${name}.sai
+  #bwa samse ref.fa aln_sa.sai short_read.fq > aln-se.sam
+  bwa samse -n 1 ${BWAIDX} ${TMPDIR}/${name}.sai ${TMPDIR}/nodups/${name}_end.fastq.gz| \
+  samtools view -b -q 10 - | samtools sort -n -@ ${thread}  - >  ${TMPDIR}/$name.sort.bam &
+  
  done
+wait
+  rm ${TMPDIR}/*.sai
+  cp ${TMPDIR}/${name}.sort.bam ${OUTPUT} ## Saves the sorted BAM in the output file.
+
+
 
 ## Cleanup
 #find ${TMPDIR} -name "*.sort.bam" -size -1024k -delete
