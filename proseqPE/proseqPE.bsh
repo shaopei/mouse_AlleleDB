@@ -594,6 +594,35 @@ wait
 #rm -r ${TMPDIR}/noadapt 
 gzip ${TMPDIR}/nodups/*.fastq 
 
+#*/
+#############################################
+## Align reads.
+echo " "
+echo "Mapping reads:"
+
+QC_INPUT=`ls  ${TMPDIR}/nodups/*_dedup_end_1.fastq.gz | awk -F"/" '{print $NF}' | rev | cut -d \. -f 2- | cut -d _ -f2- | rev| sort | uniq`
+#*/
+if [[ ${#QC_INPUT} == 0 ]]; then
+  echo "#########################################"
+  echo " Something went wrong with Preprocess."
+  echo " No fastq.gz files passed."
+  echo " Aborting."
+  echo "#########################################"
+  exit 1
+fi
+
+for name in ${QC_INPUT}
+ do
+  ## Align using BWA.
+  bwa mem -k 19 -t ${thread} ${BWAIDX} ${TMPDIR}/nodups/${name}_1.fastq.gz ${TMPDIR}/nodups/${name}_2.fastq.gz | \
+  samtools view -bf 0x2 -q 10 - | samtools sort -n -@ ${thread} - > ${TMPDIR}/${name}.sort.bam
+    
+  cp ${TMPDIR}/${name}.sort.bam ${OUTPUT} ## Saves the sorted BAM in the output file.
+ done
+
+## Cleanup
+#find ${TMPDIR} -name "*.sort.bam" -size -1024k -delete
+
 fi
 
 
