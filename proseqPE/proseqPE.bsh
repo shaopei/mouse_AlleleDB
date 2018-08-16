@@ -559,6 +559,7 @@ for name in ${FQ_INPUT[@]}
   # Read1
   # remove UMI2 and add_barcode2 from the 3 prime end of R1
    n2=$[UMI2+add_barcode2]
+   n1=$[UMI1+add_barcode1]
    cutadapt --cut -${n2} --minimum-length 15 ${TMPDIR}/${name}_trim.fastq --output=${TMPDIR}/${name}_trim.${n2}Nremoved.fastq -q 20 &
    cutadapt --minimum-length 15 ${TMPDIR}/${name}_untrim.fastq --output=${TMPDIR}/${name}_q20trim.fastq -q 20 &
    wait
@@ -571,15 +572,15 @@ for name in ${FQ_INPUT[@]}
    # Remove PCR duplciates.
    prinseq-lite.pl -derep 1 -fastq ${TMPDIR}/noadapt/${name}_noadapt.fastq -out_format 3 -out_bad null -out_good ${TMPDIR}/nodups/${name}_dedup_withBarcode 2> ${OUTPUT}/${name}.prinseq-pcrDups.gd
    # trim the UMI and additional barcode after dereplicate
-   prinseq-lite.pl -trim_left ${n1} -fastq ${TMPDIR}/nodups/${name}_dedup_withBarcode_1.fastq -out_format 3 -out_bad null -out_good ${TMPDIR}/nodups/${name}_dedup_NoBarcode_1 2>> ${OUTPUT}/${name}.prinseq-pcrDups.gd
+   prinseq-lite.pl -trim_left ${n1} -fastq ${TMPDIR}/nodups/${name}_dedup_withBarcode.fastq -out_format 3 -out_bad null -out_good ${TMPDIR}/nodups/${name}_dedup_NoBarcode 2>> ${OUTPUT}/${name}.prinseq-pcrDups.gd
  
    # min_len 15
-   prinseq-lite.pl -min_len 15 -fastq ${TMPDIR}/nodups/${name}_dedup_NoBarcode_1.fastq -out_format 3 -out_bad null -out_good ${TMPDIR}/nodups/${name}_dedup_end 2>> ${OUTPUT}/${name}.prinseq-pcrDups.gd
+   prinseq-lite.pl -min_len 15 -fastq ${TMPDIR}/nodups/${name}_dedup_NoBarcode.fastq -out_format 3 -out_bad null -out_good ${TMPDIR}/nodups/${name}_dedup_end 2>> ${OUTPUT}/${name}.prinseq-pcrDups.gd
   else
    # trim the UMI and additional barcode WITHOUT dereplicate. If no barcode, prinseq-lite.pl will remove unpair reads and reads that are length 0
-   prinseq-lite.pl -trim_left ${add_barcode1} -fastq ${TMPDIR}/noadapt/${name}_noadapt.fastq -out_format 3 -out_bad null -out_good ${TMPDIR}/nodups/${name}_dedup_NoBarcode_1 2>> ${OUTPUT}/${name}.prinseq-pcrDups.gd
+   prinseq-lite.pl -trim_left ${add_barcode1} -fastq ${TMPDIR}/noadapt/${name}_noadapt.fastq -out_format 3 -out_bad null -out_good ${TMPDIR}/nodups/${name}_dedup_NoBarcode 2>> ${OUTPUT}/${name}.prinseq-pcrDups.gd
    # min_len 15
-   prinseq-lite.pl -min_len 15 -fastq ${TMPDIR}/nodups/${name}_dedup_NoBarcode_1.fastq -out_format 3 -out_bad null -out_good ${TMPDIR}/nodups/${name}_dedup_end 2> ${OUTPUT}/${name}.prinseq-pcrDups.gd
+   prinseq-lite.pl -min_len 15 -fastq ${TMPDIR}/nodups/${name}_dedup_NoBarcode.fastq -out_format 3 -out_bad null -out_good ${TMPDIR}/nodups/${name}_dedup_end 2> ${OUTPUT}/${name}.prinseq-pcrDups.gd
   fi
 
 
