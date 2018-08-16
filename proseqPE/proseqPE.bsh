@@ -580,58 +580,32 @@ for name in ${FQ_INPUT[@]}
   ## Collapse reads using prinseq-lite.pl. if there are UMI barcodes
   if [[ ${UMI2} != 0 || ${UMI1} != 0 ]]; then 
    # Remove PCR duplciates.
-   prinseq-lite.pl -derep 1 -fastq ${TMPDIR}/noadapt/${name}_noadapt_R1.fastq -fastq2 ${TMPDIR}/noadapt/${name}_noadapt_R2.fastq -out_format 3 -out_bad null -out_good ${TMPDIR}/nodups/${name}_dedup_withBarcode 2> ${OUTPUT}/${name}.prinseq-pcrDups.gd
+   prinseq-lite.pl -derep 1 -fastq ${TMPDIR}/noadapt/${name}_noadapt_R1.fastq -out_format 3 -out_bad null -out_good ${TMPDIR}/nodups/${name}_dedup_withBarcode 2> ${OUTPUT}/${name}.prinseq-pcrDups.gd
    # trim the UMI and additional barcode after dereplicate
    prinseq-lite.pl -trim_left ${n1} -fastq ${TMPDIR}/nodups/${name}_dedup_withBarcode_1.fastq -out_format 3 -out_bad null -out_good ${TMPDIR}/nodups/${name}_dedup_NoBarcode_1 2>> ${OUTPUT}/${name}.prinseq-pcrDups.gd
-   prinseq-lite.pl -trim_left ${n2} -fastq ${TMPDIR}/nodups/${name}_dedup_withBarcode_2.fastq -out_format 3 -out_bad null -out_good ${TMPDIR}/nodups/${name}_dedup_NoBarcode_2 2>> ${OUTPUT}/${name}.prinseq-pcrDups.gd
+ 
    # min_len 15
-   prinseq-lite.pl -min_len 15 -fastq ${TMPDIR}/nodups/${name}_dedup_NoBarcode_1.fastq -fastq2 ${TMPDIR}/nodups/${name}_dedup_NoBarcode_2.fastq -out_format 3 -out_bad null -out_good ${TMPDIR}/nodups/${name}_dedup_end 2>> ${OUTPUT}/${name}.prinseq-pcrDups.gd
+   prinseq-lite.pl -min_len 15 -fastq ${TMPDIR}/nodups/${name}_dedup_NoBarcode_1.fastq -out_format 3 -out_bad null -out_good ${TMPDIR}/nodups/${name}_dedup_end 2>> ${OUTPUT}/${name}.prinseq-pcrDups.gd
   else
    # trim the UMI and additional barcode WITHOUT dereplicate. If no barcode, prinseq-lite.pl will remove unpair reads and reads that are length 0
    prinseq-lite.pl -trim_left ${add_barcode1} -fastq ${TMPDIR}/noadapt/${name}_noadapt_R1.fastq -out_format 3 -out_bad null -out_good ${TMPDIR}/nodups/${name}_dedup_NoBarcode_1 2>> ${OUTPUT}/${name}.prinseq-pcrDups.gd
-   prinseq-lite.pl -trim_left ${add_barcode2} -fastq ${TMPDIR}/noadapt/${name}_noadapt_R2.fastq -out_format 3 -out_bad null -out_good ${TMPDIR}/nodups/${name}_dedup_NoBarcode_2 2>> ${OUTPUT}/${name}.prinseq-pcrDups.gd
    # min_len 15
-   prinseq-lite.pl -min_len 15 -fastq ${TMPDIR}/nodups/${name}_dedup_NoBarcode_1.fastq -fastq2 ${TMPDIR}/nodups/${name}_dedup_NoBarcode_2.fastq -out_format 3 -out_bad null -out_good ${TMPDIR}/nodups/${name}_dedup_end 2> ${OUTPUT}/${name}.prinseq-pcrDups.gd
+   prinseq-lite.pl -min_len 15 -fastq ${TMPDIR}/nodups/${name}_dedup_NoBarcode_1.fastq -out_format 3 -out_bad null -out_good ${TMPDIR}/nodups/${name}_dedup_end 2> ${OUTPUT}/${name}.prinseq-pcrDups.gd
   fi
 
 
   rm ${TMPDIR}/${name}_trim_R1.fastq ${TMPDIR}/${name}_untrim_R1.fastq ${TMPDIR}/${name}_q20trim_R1.fastq ${TMPDIR}/${name}_trim.${n2}Nremoved_R1.fastq
-  rm ${TMPDIR}/${name}_trim_R2.fastq ${TMPDIR}/${name}_untrim_R2.fastq ${TMPDIR}/${name}_q20trim_R2.fastq ${TMPDIR}/${name}_trim.${n1}Nremoved_R2.fastq
+
 
  done
 
 wait
 ## Cleanup.
-rm -r ${TMPDIR}/noadapt 
+#rm -r ${TMPDIR}/noadapt 
 gzip ${TMPDIR}/nodups/*.fastq 
 
+fi
 
-
-
-
-#/*
-for fastq in `ls $FQ_INPUT`
- do
-   name=`echo $fastq | awk -F"/" '{print $NF}' | cut -d \. -f 1`
-
-   ## Collapse reads using prinseq-lite.pl if -b6 is given
-   ## Trim adapters using cutadapt
-   #Remove reads not passing Illumina QC? (SPC: Not sure which line do this)
-   if ! [ -z "$B6" ]; then 
-    zcat $fastq | prinseq-lite.pl -derep 1 -fastq stdin -out_format 3 -out_good stdout -out_bad null 2> ${OUTPUT}/$name.pcr_dups.txt | \
-    prinseq-lite.pl -trim_left 6 -fastq stdin -out_format 3 -out_good stdout -out_bad null -min_len 10| gzip > ${TMPDIR}/filtered/$name.filt.fastq.gz  
-    cutadapt -a TGGAATTCTCGGGTGCCAAGG -z -e 0.10 --minimum-length=10 --output=${TMPDIR}/noadapt/$name.na.fastq.gz ${TMPDIR}/filtered/$name.filt.fastq.gz
-   else
-    #zcat $fastq | grep -A 3 '^@.* [^:]*:N:[^:]*:' | sed '/^--$/d' | gzip > ${TMPDIR}/filtered/$name.filt.fastq.gz
-  ## Trim adapters
-    cutadapt -a TGGAATTCTCGGGTGCCAAGG -z -e 0.10 --minimum-length=10 --output=${TMPDIR}/noadapt/$name.na.fastq.gz $fastq
-   fi
-
-   ## Compute ... if desired.
-   if ! [ -z "$QC" ]; then 
-     zcat ${TMPDIR}/noadapt/$name.na.fastq.gz | prinseq-lite.pl -graph_stats ld,qd,de -qual_noscale -exact_only -out_bad null -out_good null -fastq stdin -graph_data ${OUTPUT}/$name.prinseq.gd
-   fi
- done
 
 
 
