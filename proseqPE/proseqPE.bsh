@@ -643,23 +643,12 @@ fi
 for name in ${QC_INPUT}
  do
   ## Align using BWA.
-  #bwa aln ref.fa short_read.fq > aln_sa.sai
-  #bwa aln -t ${thread} ${BWAIDX}  ${TMPDIR}/nodups/${name}_end.fastq.gz > ${TMPDIR}/${name}.sai
-  
-  #bwa samse ref.fa aln_sa.sai short_read.fq > aln-se.sam
-  #bwa samse -n 1 ${BWAIDX} ${TMPDIR}/${name}.sai ${TMPDIR}/nodups/${name}_end.fastq.gz| \
-  #samtools view -b -q 10 - | samtools sort -n -@ ${thread}  - >  ${TMPDIR}/$name.sort.bam &
-  
-  ## Align using BWA.
   bwa mem -k 19 -t ${thread} ${BWAIDX} ${TMPDIR}/nodups/${name}_end.fastq.gz | \
-  samtools view -b -q 10 - | samtools sort -n -@ ${thread} - > ${TMPDIR}/${name}.sort.bam
-    
+  samtools view -b -q 10 - | samtools sort -n -@ ${thread} - > ${TMPDIR}/${name}.sort.bam &
+done
 
-
-
- done
 wait
-  #rm ${TMPDIR}/*.sai
+
   cp ${TMPDIR}/${name}.sort.bam ${OUTPUT} ## Saves the sorted BAM in the output file.
 
 
