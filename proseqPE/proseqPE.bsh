@@ -33,11 +33,11 @@ while test $# -gt 0; do
       echo "Optional operations:"
       echo "--RNA5=R1_5prime    Specify the location of the 5' end of RNA [default: R1_5prime]"
       echo "--RNA3=R2_5prime    Specify the location of the 3' end of RNA [default: R2_5prime]"
-      echo "                    Available options: R1_5prime: the 5' end of R1 reads"
+      echo "                    Available options: R1_5prime: the 5' end of R1 reads or Single_End reads"
       echo "                                       R2_5prime: the 5' end of R2 reads" 
       echo " "
       echo "-5, --map5=TRUE     Report the 5' end of RNA [default --map5=TRUE]"
-      echo "-3, --map5=FALSE    Report the 3' end of RNA [default --map5=TRUE]"
+      echo "-3, --map5=FALSE    Report the 3' end of RNA, only available for PE [default --map5=TRUE]"
       echo "-s, --opposite-strand=TRUE"  
       echo "                    Enable this option if the RNA are at the different strand" 
       echo "                    as the reads set at RNA5 [default: disable]"
@@ -195,6 +195,20 @@ while test $# -gt 0; do
                         export add_barcode2=`echo $1 | sed -e 's/^[^=]*=//g'`
                         shift
                         ;;
+                -G)
+                        export SE_OUTPUT="G"
+                        export RNA5="R1_5prime"
+                        export OPP="FALSE"
+                        export MAP5="TRUE"
+                        shift
+                        ;;
+                -P)
+                        export SE_OUTPUT="P"
+                        export RNA3="R1_5prime"
+                        export OPP="TRUE"
+                        export MAP5="TRUE"
+                        shift
+                        ;;
                 *)
                         break
                         ;;
@@ -252,10 +266,13 @@ if [[ "$SEQ" == "PE" ]] ; then
 
 # SE
 elif [[ "$SEQ" == "SE" ]] ; then
+  if [ -z "$SE_OUTPUT" ] ; then
+  echo "Please specify output format for SE [-G or -P]"
+  exit 1
+  fi
   if [[ "$FQ_INPUT" == "*.fastq.gz" ]]; then
     FQ_INPUT=`ls *.fastq.gz | awk -F"/" '{print $NF}' | rev | cut -d \. -f 3-| rev`
-  fi
-  if [ -z "$FQ_INPUT" ]; then
+  elif [ -z "$FQ_INPUT" ]; then
     echo "No input files specified.  Using *.fastq.gz"
     FQ_INPUT=`ls *.fastq.gz | awk -F"/" '{print $NF}' | rev | cut -d \. -f 3-| rev`
   fi
@@ -313,25 +330,37 @@ fi
 if [[ -z "$RNA5" && -z "$RNA3" ]]; then
     RNA5="R1_5prime"
 fi
-if [[ "$RNA3" == "R1_5prime" ]]; then
+
+if [[ "$SEQ" == "PE" ]]; then
+  if [[ "$RNA3" == "R1_5prime" ]]; then
    RNA5="R2_5prime"
+  elif [[ "$RNA3" == "R2_5prime" ]]; then
+    RNA5="R1_5prime"
+  fi
+  
+  if [[ "$RNA5" == "R1_5prime" || "$RNA5" == "R2_5prime" ]] ; then 
+          :
+  else
+          echo "--RNA5 and --RNA3 value can only be R1_5prime or R2_5prime."
+          echo " use bash proseq_PE.bsh --help."
+          exit 1
+  fi
 fi
-if [[ "$RNA3" == "R2_5prime" ]]; then
-   RNA5="R1_5prime"
-fi
-if [[ "$RNA5" == "R1_5prime" || "$RNA5" == "R2_5prime" ]] ; then 
-        :
-else
-        echo "--RNA5 and --RNA3 value can only be R1_5prime or R2_5prime."
-        echo " use bash proseq_PE.bsh --help."
-        exit 1
-fi
+
 if [ -z "$OPP" ]; then
    OPP="FALSE"
 fi
 if [ -z "$MAP5" ]; then
         MAP5="TRUE"
 fi
+
+
+if [[ "${MAP5}" == "FALSE" && "$SEQ" == "SE" ]] ; then 
+  echo "For single-end (SE), can only report the 5 prime end of reads (--map5=TRUE)"
+  exit 1
+fi
+
+
 if [ "${MAP5}" == "TRUE" ] ; then 
         :
 elif [ "${MAP5}" == "FALSE" ] ; then
@@ -615,20 +644,78 @@ for name in ${QC_INPUT}
  do
   ## Align using BWA.
   #bwa aln ref.fa short_read.fq > aln_sa.sai
-  bwa aln -t ${thread} ${BWAIDX}  ${TMPDIR}/nodups/${name}_end.fastq.gz > ${TMPDIR}/${name}.sai
-  #bwa samse ref.fa aln_sa.sai short_read.fq > aln-se.sam
-  bwa samse -n 1 ${BWAIDX} ${TMPDIR}/${name}.sai ${TMPDIR}/nodups/${name}_end.fastq.gz| \
-  samtools view -b -q 10 - | samtools sort -n -@ ${thread}  - >  ${TMPDIR}/$name.sort.bam &
+  #bwa aln -t ${thread} ${BWAIDX}  ${TMPDIR}/nodups/${name}_end.fastq.gz > ${TMPDIR}/${name}.sai
   
+  #bwa samse ref.fa aln_sa.sai short_read.fq > aln-se.sam
+  #bwa samse -n 1 ${BWAIDX} ${TMPDIR}/${name}.sai ${TMPDIR}/nodups/${name}_end.fastq.gz| \
+  #samtools view -b -q 10 - | samtools sort -n -@ ${thread}  - >  ${TMPDIR}/$name.sort.bam &
+  
+  ## Align using BWA.
+  bwa mem -k 19 -t ${thread} ${BWAIDX} ${TMPDIR}/nodups/${name}_end.fastq.gz | \
+  samtools view -b -q 10 - | samtools sort -n -@ ${thread} - > ${TMPDIR}/${name}.sort.bam
+    
+
+
+
  done
 wait
-  rm ${TMPDIR}/*.sai
+  #rm ${TMPDIR}/*.sai
   cp ${TMPDIR}/${name}.sort.bam ${OUTPUT} ## Saves the sorted BAM in the output file.
 
 
 
 ## Cleanup
 #find ${TMPDIR} -name "*.sort.bam" -size -1024k -delete
+
+
+#############################################
+## Write out the bigWigs.
+echo " "
+echo "Writing bigWigs:"
+for f in ${TMPDIR}/*.sort.bam
+ do
+#*/
+   j=`echo $f | awk -F"/" '{print $NF}' | rev | cut -d \. -f 3- |rev `
+   echo $j > ${OUTPUT}/${j}.align.log
+
+# in SE, MAP5 alwasys TRUE
+
+
+   if [[ "${RNA5}" == "R1_5prime" && "${OPP}" == "FALSE" ]] ; then ## report The 5 prime end of the RNA.   #like GRO-seq
+     #if [ "${OPP}" == "FALSE" ] ; then  
+        bedtools bamtobed -i $f 2> ${TMPDIR}/kill.warnings| awk 'BEGIN{OFS="\t"} ($5 > 0){print $0}' | \
+        awk 'BEGIN{OFS="\t"} ($6 == "+") {print $1,$2,$2+1,$4,$5,$6}; ($6 == "-") {print $1,$3-1,$3,$4,$5,$6}' | gzip > ${TMPDIR}/$j.bed.gz
+   echo "G" 
+   elif [[ "${RNA3}" == "R1_5prime" && "${OPP}" == "TRUE" ]] ; then  #like PRO-seq
+   echo "P" 
+    bedtools bamtobed -i $f 2> ${TMPDIR}/kill.warnings| awk 'BEGIN{OFS="\t"} ($5 > 0){print $0}' | \
+        awk 'BEGIN{OFS="\t"} ($6 == "+") {print $1,$2,$2+1,$4,$5,"-"}; ($6 == "-") {print $1,$3-1,$3,$4,$5,"+"}' | gzip > ${TMPDIR}/$j.bed.gz
+   fi
+
+
+   echo 'Number of mappable reads:' >> ${OUTPUT}/${j}.align.log
+   echo `zcat ${TMPDIR}/$j.bed.gz | grep "" -c` >> ${OUTPUT}/${j}.align.log
+   
+   ## Remove rRNA and reverse the strand (PRO-seq).
+   zcat ${TMPDIR}/$j.bed.gz | grep "rRNA\|chrM" -v | grep "_" -v | sort-bed - | gzip > ${TMPDIR}/$j.nr.rs.bed.gz
+   echo 'Number of mappable reads (excluding rRNA):' >> ${OUTPUT}/${j}.align.log
+   echo `zcat ${TMPDIR}/$j.nr.rs.bed.gz | grep "" -c` >> ${OUTPUT}/${j}.align.log
+   
+   ## Convert to bedGraph ... Can't gzip these, unfortunately.
+   bedtools genomecov -bg -i ${TMPDIR}/$j.nr.rs.bed.gz -g ${CHINFO} -strand + > ${TMPDIR}/$j\_plus.bedGraph
+   bedtools genomecov -bg -i ${TMPDIR}/$j.nr.rs.bed.gz -g ${CHINFO} -strand - > ${TMPDIR}/$j\_minus.noinv.bedGraph
+   
+   ## Invert minus strand.
+   cat ${TMPDIR}/$j\_minus.noinv.bedGraph | awk 'BEGIN{OFS="\t"} {print $1,$2,$3,-1*$4}' > ${TMPDIR}/$j\_minus.bedGraph ## Invert read counts on the minus strand.
+   
+   ## Then to bigWig
+   bedGraphToBigWig ${TMPDIR}/$j\_plus.bedGraph ${CHINFO} ${OUTPUT}/$j\_plus.bw
+   bedGraphToBigWig ${TMPDIR}/$j\_minus.bedGraph ${CHINFO} ${OUTPUT}/$j\_minus.bw
+
+   #rm ${TMPDIR}/$j.nr.rs.bed.gz ${TMPDIR}/$j.bed.gz ${TMPDIR}/$j*.bedGraph
+ done
+
+
 
 fi
 
