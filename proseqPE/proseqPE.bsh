@@ -199,14 +199,20 @@ while test $# -gt 0; do
                         export SE_OUTPUT="G"
                         export RNA5="R1_5prime"
                         export OPP="FALSE"
-                        export MAP5="TRUE"
+                        #export MAP5="TRUE"
+                        export SE_READ="RNA_5prime"
                         shift
                         ;;
                 -P)
                         export SE_OUTPUT="P"
                         export RNA3="R1_5prime"
                         export OPP="TRUE"
-                        export MAP5="TRUE"
+                        #export MAP5="TRUE"
+                        export SE_READ="RNA_3prime"
+                        shift
+                        ;;
+                --SE_READ*)
+                        export SE_READ=`echo $1 | sed -e 's/^[^=]*=//g'`
                         shift
                         ;;
                 *)
@@ -233,7 +239,7 @@ if [ -z "$SEQ" ]; then
   exit 1
 fi
 
-## INPUT
+## INPUT & Parameters
 # PE
 if [[ "$SEQ" == "PE" ]] ; then 
   if [[ "$FQ_INPUT" == "*.fastq.gz" ]]; then
@@ -266,6 +272,17 @@ if [[ "$SEQ" == "PE" ]] ; then
 
 # SE
 elif [[ "$SEQ" == "SE" ]] ; then
+  if [[ "$SE_READ" == "RNA_5prime" ]] ; then
+    SE_OUTPUT="G"
+    RNA5="R1_5prime"
+    OPP="FALSE"
+    #MAP5="TRUE"
+  elif [[ "$SE_READ" == "RNA_3prime" ]] ; then
+    SE_OUTPUT="P"
+    RNA3="R1_5prime"
+    OPP="FALSE"
+    #MAP5="TRUE"
+  fi
   if [ -z "$SE_OUTPUT" ] ; then
   echo "Please specify output format for SE [-G or -P]"
   exit 1
@@ -327,11 +344,12 @@ fi
 if [ -z "$add_barcode2" ]; then
    add_barcode2=0
 fi
-if [[ -z "$RNA5" && -z "$RNA3" ]]; then
-    RNA5="R1_5prime"
-fi
+
 
 if [[ "$SEQ" == "PE" ]]; then
+  if [[ -z "$RNA5" && -z "$RNA3" ]]; then
+    RNA5="R1_5prime"
+  fi
   if [[ "$RNA3" == "R1_5prime" ]]; then
    RNA5="R2_5prime"
   elif [[ "$RNA3" == "R2_5prime" ]]; then
@@ -385,10 +403,25 @@ TMPDIR=$TMPDIR/$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
 echo " " 
 echo "Processing PRO-seq data ..." 
 echo " "
+echo "SEQ                       $SEQ"
+
+if [[ "$SEQ" == "SE" ]]; then
+echo "SE_OUTPUT                 $SE_OUTPUT"
+echo "SE_READ                   $SE_READ"
+fi
+
+if [[ "$SEQ" == "PE" ]]; then
+echo "Location of 5' of RNA     $RNA5"
+echo "Location of 3' of RNA     $RNA3"
+fi
+
+echo "Report 5' ends            $MAP5"
+echo "Report opposite strand    $OPP"
+
+echo ""
 echo "Input files/ paths:"
 echo "bwa index                 $BWAIDX"
 echo "chromInfo                 $CHINFO"
-echo "SEQ                       $SEQ"
 i=1
 for name in ${FQ_INPUT[@]}
   do echo "input prefix $i            $name"
@@ -398,11 +431,6 @@ echo "temp folder               $TMPDIR"
 echo "output-dir                $OUTPUT"
 echo " "
 echo "Optional operations:"
-echo "Location of 5' of RNA     $RNA5"
-echo "Location of 3' of RNA     $RNA3"
-echo "Report 5' ends            $MAP5"
-echo "Report opposite strand    $OPP"
-echo " " 
 echo "ADAPT1                    $ADAPT1"
 echo "ADAPT2                    $ADAPT2"
 echo "UMI1 barcode length       $UMI1"
@@ -410,6 +438,7 @@ echo "UMI2 barcode length       $UMI2"
 echo "add_barcode1 length       $add_barcode1"
 echo "add_barcode2 length       $add_barcode2"
 echo "number of threads         $thread"
+
 
 
 ## Exits .. for debugging.
@@ -670,15 +699,14 @@ for f in ${TMPDIR}/*.sort.bam
 # in SE, MAP5 alwasys TRUE
 
 
-   if [[ "${RNA5}" == "R1_5prime" && "${OPP}" == "FALSE" ]] ; then ## report The 5 prime end of the RNA.   #like GRO-seq
-     #if [ "${OPP}" == "FALSE" ] ; then  
-        bedtools bamtobed -i $f 2> ${TMPDIR}/kill.warnings| awk 'BEGIN{OFS="\t"} ($5 > 0){print $0}' | \
-        awk 'BEGIN{OFS="\t"} ($6 == "+") {print $1,$2,$2+1,$4,$5,$6}; ($6 == "-") {print $1,$3-1,$3,$4,$5,$6}' | gzip > ${TMPDIR}/$j.bed.gz
-   echo "G" 
-   elif [[ "${RNA3}" == "R1_5prime" && "${OPP}" == "TRUE" ]] ; then  #like PRO-seq
-   echo "P" 
-    bedtools bamtobed -i $f 2> ${TMPDIR}/kill.warnings| awk 'BEGIN{OFS="\t"} ($5 > 0){print $0}' | \
-        awk 'BEGIN{OFS="\t"} ($6 == "+") {print $1,$2,$2+1,$4,$5,"-"}; ($6 == "-") {print $1,$3-1,$3,$4,$5,"+"}' | gzip > ${TMPDIR}/$j.bed.gz
+   #if [[ "${RNA5}" == "R1_5prime" && "${OPP}" == "FALSE" ]] ; then ## report The 5 prime end of the RNA.   #like GRO-seq
+   if [[ "$SE_OUTPUT" == "G" ]] ; then
+      bedtools bamtobed -i $f 2> ${TMPDIR}/kill.warnings| awk 'BEGIN{OFS="\t"} ($5 > 0){print $0}' | \
+      awk 'BEGIN{OFS="\t"} ($6 == "+") {print $1,$2,$2+1,$4,$5,$6}; ($6 == "-") {print $1,$3-1,$3,$4,$5,$6}' | gzip > ${TMPDIR}/$j.bed.gz
+   #elif [[ "${RNA3}" == "R1_5prime" && "${OPP}" == "TRUE" ]] ; then  #like PRO-seq
+    elif [[ "$SE_OUTPUT" == "P" ]] ; then
+      bedtools bamtobed -i $f 2> ${TMPDIR}/kill.warnings| awk 'BEGIN{OFS="\t"} ($5 > 0){print $0}' | \
+      awk 'BEGIN{OFS="\t"} ($6 == "+") {print $1,$2,$2+1,$4,$5,"-"}; ($6 == "-") {print $1,$3-1,$3,$4,$5,"+"}' | gzip > ${TMPDIR}/$j.bed.gz
    fi
 
 
