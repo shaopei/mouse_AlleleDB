@@ -7,7 +7,7 @@ while test $# -gt 0; do
     echo "Preprocesses and aligns PRO-seq data."
     echo ""
     echo "Takes *.fastq.gz in the current working directory as input and writes"
-    echo "BAM and bedGraph files to the current working directory as output."
+    echo "BAM and bigWig files as output to the user-assigned output-dir."
     echo ""
     echo "Requirements in current working directory:"
     echo "cutadapt 1.8.3, prinseq-lite.pl 0.20.2, bwa, samtools, bedtools, bedGraphToBigWig"
