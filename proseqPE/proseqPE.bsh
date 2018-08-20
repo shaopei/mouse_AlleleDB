@@ -48,10 +48,10 @@ while test $# -gt 0; do
     echo "                    as the reads set at RNA5 [default: disable]"
     echo ""
     echo "Optional operations:"
-    echo "--ADAPT1=AGATCGGAAGAGCACACGTCTGAACTC"
-    echo "                    3' adapter to be removed from the 3' end of R1."
-    echo "--ADAPT2=GATCGTCGGACTGTAGAACTCTGAACG"
+    echo "--ADAPT1=GATCGTCGGACTGTAGAACTCTGAACG"
     echo "                    3' adapter to be removed from the 3' end of R2."
+    echo "--ADAPT2=AGATCGGAAGAGCACACGTCTGAACTC"
+    echo "                    3' adapter to be removed from the 3' end of R1."
     echo ""
     echo "--UMI1=0            The length of UMI barcode on the 5' of R1 read. [default: 0]"
     echo "--UMI2=0            The length of UMI barcode on the 5' of R2 read. [default: 0]"
@@ -177,12 +177,12 @@ while test $# -gt 0; do
                         export OPP=`echo $1 | sed -e 's/^[^=]*=//g'`
                         shift
                         ;;
-                --ADAPT1*)
-                        export ADAPT1=`echo $1 | sed -e 's/^[^=]*=//g'`
-                        shift
-                        ;;
                 --ADAPT2*)
                         export ADAPT2=`echo $1 | sed -e 's/^[^=]*=//g'`
+                        shift
+                        ;;
+                --ADAPT1*)
+                        export ADAPT1=`echo $1 | sed -e 's/^[^=]*=//g'`
                         shift
                         ;;
                 --UMI1*)
@@ -332,11 +332,11 @@ fi
 if [ -z "$thread" ]; then
    thread=1
 fi
-if [ -z "$ADAPT1" ]; then
-        ADAPT1="AGATCGGAAGAGCACACGTCTGAACTC"
-fi
 if [ -z "$ADAPT2" ]; then
-        ADAPT2="GATCGTCGGACTGTAGAACTCTGAACG"
+        ADAPT2="AGATCGGAAGAGCACACGTCTGAACTC"
+fi
+if [ -z "$ADAPT1" ]; then
+        ADAPT1="GATCGTCGGACTGTAGAACTCTGAACG"
 fi
 if [ -z "$UMI1" ]; then
    UMI1=0
@@ -437,8 +437,8 @@ echo "temp folder               $TMPDIR"
 echo "output-dir                $OUTPUT"
 echo " "
 echo "Optional operations:"
-echo "ADAPT1                    $ADAPT1"
 echo "ADAPT2                    $ADAPT2"
+echo "ADAPT1                    $ADAPT1"
 echo "UMI1 barcode length       $UMI1"
 echo "UMI2 barcode length       $UMI2"
 echo "add_barcode1 length       $add_barcode1"
@@ -465,8 +465,8 @@ for name in ${FQ_INPUT[@]}
  do
   ## Remove adapter, UMI barcode, additional barcode, and low quality (q=20) base from 3prime end of reads. Keep read length >=15 after trimmming
   # Remove adapter
-  cutadapt -a ${ADAPT1} -e 0.10 --overlap 2 --output=${TMPDIR}/${name}_trim_R1.fastq --untrimmed-output=${TMPDIR}/${name}_untrim_R1.fastq ${name}_R1.fastq.gz &
-  cutadapt -a ${ADAPT2} -e 0.10 --overlap 2 --output=${TMPDIR}/${name}_trim_R2.fastq --untrimmed-output=${TMPDIR}/${name}_untrim_R2.fastq ${name}_R2.fastq.gz &
+  cutadapt -a ${ADAPT2} -e 0.10 --overlap 2 --output=${TMPDIR}/${name}_trim_R1.fastq --untrimmed-output=${TMPDIR}/${name}_untrim_R1.fastq ${name}_R1.fastq.gz &
+  cutadapt -a ${ADAPT1} -e 0.10 --overlap 2 --output=${TMPDIR}/${name}_trim_R2.fastq --untrimmed-output=${TMPDIR}/${name}_untrim_R2.fastq ${name}_R2.fastq.gz &
   wait
 
   # Read1
@@ -619,7 +619,7 @@ for name in ${FQ_INPUT[@]}
  do
   ## Remove adapter, UMI barcode, additional barcode, and low quality (q=20) base from 3prime end of reads. Keep read length >=15 after trimmming
   # Remove adapter
-  cutadapt -a ${ADAPT1} -e 0.10 --overlap 2 --output=${TMPDIR}/${name}_trim.fastq --untrimmed-output=${TMPDIR}/${name}_untrim.fastq ${name}.fastq.gz
+  cutadapt -a ${ADAPT2} -e 0.10 --overlap 2 --output=${TMPDIR}/${name}_trim.fastq --untrimmed-output=${TMPDIR}/${name}_untrim.fastq ${name}.fastq.gz
   # Read1
   # remove UMI2 and add_barcode2 from the 3 prime end of R1
    n2=$[UMI2+add_barcode2]
