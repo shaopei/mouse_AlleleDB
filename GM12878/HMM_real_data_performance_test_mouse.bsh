@@ -4,28 +4,29 @@
 # the allele-specificity of genes
 ln -s /workdir/sc2457/mouse_AlleleSpecific/allelicbias-PersonalGenome_P.CAST_M.B6-LEP_ZYG_ATGCA_forAlleleDB/Tm_Tp_fixed_redo/sum_of_counts.py .
 ln -s /workdir/sc2457/mouse_AlleleSpecific/allelicbias-PersonalGenome_P.CAST_M.B6-LEP_ZYG_ATGCA_forAlleleDB/Tm_Tp_fixed_redo/getFractionOfBlock_DistanceToNearestSites.R .
-ln -s /workdir/sc2457/GM_GroSeq_AlleleDB_20170606/test_in_total/SRR1552485_total.*.map2ref.sorted.bed.gz .
-ln -s /workdir/sc2457/GM_GroSeq_AlleleDB_20170606/test_in_total/AlleleHMM_result/gencode.v28lift37.annotation_geneMerged.bed .
+ln -s /workdir/sc2457/mouse_AlleleSpecific/allelicbias-PersonalGenome_P.CAST_M.129S1-SRR4041366_dedup_2/*map2ref.sorted.bed.gz .  #*/
+ln -s /workdir/sc2457/mouse_AlleleSpecific/allelicbias-PersonalGenome_P.CAST_M.129S1-SRR4041366_dedup_2/AlleleHMM/gencode.vM17.annotation_geneMerged.bed .
 
 
-#GM
-PL=/workdir/sc2457/alleleDB/alleledb_pipeline
-MAPS=/workdir/sc2457/alleleseq.gersteinlab.org/NA12878_diploid/NA12878_diploid_2015_feb5_3versions/1kgp3-svs-pass_NA12878_hg19_150109_w_transcriptome/%s_NA12878.map
-PREFIX=SRR1552485_total
+PL=/workdir/sc2457/alleleDB/alleledb_pipeline_mouse
+MAPS=/workdir/sc2457/mouse_AlleleSpecific/mouse_genome.sanger.ac.uk/REL-1505-SNPs_Indels/PersonalGenome_P.CAST_M.129S1_indelsNsnps_CAST.subsample.bam/%s_P.CAST.EiJ_M.129S1.SvImJ.map
+PREFIX=SRR4041366_dedup_2
 MATBOWTIE=${PREFIX}.mat.bowtie
 PATBOWTIE=${PREFIX}.pat.bowtie
 FDR_SIMS=10
 FDR_CUTOFF=0.1
-bed_f=gencode.v28lift37.annotation_geneMerged.bed
-j=gencode.v28lift37.annotation_geneMerged
 
-bedtools coverage -a ${bed_f} -b <(zcat ${MATBOWTIE}_AMBremoved_sorted_specific.map2ref.sorted.bed.gz) -s | awk 'BEGIN {OFS="\t"; t="_"} {print $1t$2t$3t$6, $0}' |LC_ALL=C sort -k1,1 --parallel=30 > ${j}.mat_cov.bed &
-bedtools coverage -a ${bed_f} -b <(zcat ${PATBOWTIE}_AMBremoved_sorted_specific.map2ref.sorted.bed.gz) -s | awk 'BEGIN {OFS="\t"; t="_"} {print $1t$2t$3t$6, $0}' |LC_ALL=C sort -k1,1 --parallel=30 > ${j}.pat_cov.bed &
+bed_f=gencode.vM17.annotation_geneMerged.bed
+j=gencode.vM17.annotation_geneMerged
+
+bedtools coverage -a ${bed_f} -b <(zcat ${MATBOWTIE}_AMBremoved_sorted_specific.map2ref.sorted.bed.gz | awk 'BEGIN {OFS="\t"} {print "chr"$0}') -s | awk 'BEGIN {OFS="\t"; t="_"} {print $1t$2t$3t$6, $0}' |LC_ALL=C sort -k1,1 --parallel=30 > ${j}.mat_cov.bed &
+bedtools coverage -a ${bed_f} -b <(zcat ${PATBOWTIE}_AMBremoved_sorted_specific.map2ref.sorted.bed.gz| awk 'BEGIN {OFS="\t"} {print "chr"$0}') -s | awk 'BEGIN {OFS="\t"; t="_"} {print $1t$2t$3t$6, $0}' |LC_ALL=C sort -k1,1 --parallel=30 > ${j}.pat_cov.bed &
 wait
 join -t $'\t' -j 1 -o 1.1,1.2,1.3,1.4,1.5,1.8,2.8 ${j}.mat_cov.bed ${j}.pat_cov.bed > ${j}.temp_cov.bed &
-bedtools coverage -a ${bed_f} -b <(zcat ${PATBOWTIE}_AMBremoved_sorted_identical.map2ref.sorted.bed.gz) -s | awk 'BEGIN {OFS="\t"; t="_"} {print $1t$2t$3t$6, $0}' |LC_ALL=C sort -k1,1 --parallel=30 > ${j}.iden_cov.bed &
+bedtools coverage -a ${bed_f} -b <(zcat ${PATBOWTIE}_AMBremoved_sorted_identical.map2ref.sorted.bed.gz| awk 'BEGIN {OFS="\t"} {print "chr"$0}') -s | awk 'BEGIN {OFS="\t"; t="_"} {print $1t$2t$3t$6, $0}' |LC_ALL=C sort -k1,1 --parallel=30 > ${j}.iden_cov.bed &
 wait
 join -t $'\t' -j 1 -o 1.1,1.2,1.3,1.4,1.5,1.6,1.7,2.8 ${j}.temp_cov.bed ${j}.iden_cov.bed | LC_ALL=C sort -k1,2V -k2,3n --parallel=30 > ${j}.merged_cov.bed
+mkdir toremove
 mv ${j}.temp_cov.bed ${j}.mat_cov.bed ${j}.pat_cov.bed ${j}.iden_cov.bed toremove
 mv ${j}.merged_cov.bed ${j}.merged_cov.bed_temp
 # keep genes with at lease 1 read
