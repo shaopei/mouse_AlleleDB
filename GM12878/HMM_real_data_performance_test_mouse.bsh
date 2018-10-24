@@ -51,7 +51,7 @@ rm tmp.bed
 for s in plus minus
 	do 
     # SNPs (with at least 1 read mapped) covered by gene annotation_withAllele-specificity
-    intersectBed -u -s -a <(cat counts_${s}_noX_MinCount1_MaxPvalue1_IGV.bed| awk '{print "chr"$0}') -b ${j}_withAllele-specificity_FDR.bed > SNP_${s}_in_${j}_withAllele-specificity_FDR.bed
+    intersectBed -u -s -a counts_${s}_noX_MinCount1_MaxPvalue1.bed -b ${j}_withAllele-specificity_FDR.bed > SNP_${s}_in_${j}_withAllele-specificity_FDR.bed
 done
 
 
@@ -66,8 +66,8 @@ done
 for s in plus minus
 	do 
     # SNPs (with at least 1 read mapped) covered by gene annotation_withAllele-specificity
-    intersectBed -wb -a SNP_${s}_in_${j}_withAllele-specificity_FDR.bed -b <(cat interestingHets_${s}_MinCount1_MaxPvalue1.bed | awk 'NR>1 {print "chr"$0}') | awk 'BEGIN{OFS="\t"} {print $1,$2,$3,$4,$5,$6, $13}'> SNP_${s}_AlleleDB_temp
-    intersectBed -v -a SNP_${s}_in_${j}_withAllele-specificity_FDR.bed -b <(cat interestingHets_${s}_MinCount1_MaxPvalue1.bed | awk 'NR>1 {print "chr"$0}') | awk 'BEGIN{OFS="\t"} {print $1,$2,$3,$4,$5,$6, "S"}'>> SNP_${s}_AlleleDB_temp
+    intersectBed -wb -a SNP_${s}_in_${j}_withAllele-specificity_FDR.bed -b interestingHets_${s}_MinCount1_MaxPvalue1.bed | awk 'BEGIN{OFS="\t"} {print $1,$2,$3,$4,$5,$6, substr($10,1,1)}'> SNP_${s}_AlleleDB_temp
+    intersectBed -v -a SNP_${s}_in_${j}_withAllele-specificity_FDR.bed -b interestingHets_${s}_MinCount1_MaxPvalue1.bed | awk 'BEGIN{OFS="\t"} {print $1,$2,$3,$4,$5,$6, "S"}'>> SNP_${s}_AlleleDB_temp
     cat SNP_${s}_AlleleDB_temp | LC_ALL=C sort -k1,1V -k2,2n --parallel=30 > SNP_${s}_AlleleDB
     rm SNP_${s}_AlleleDB_temp 
 done
