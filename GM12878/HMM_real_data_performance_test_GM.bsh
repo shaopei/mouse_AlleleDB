@@ -35,10 +35,18 @@ python ${PL}/BinomialTestFor_merged_cov.bed.py ${j}.merged_cov.bed ${j}.merged_c
 # mv ${j}.merged_cov.bed ${j}.merged_cov.bed_temp toremove
 # output of BinomialTestFor_merged_cov.bed.py:(hmm+BinomialTest) if p-value <= 0.05, remain what it got from hmm (can ne M,P, or S), otherwise S.
 python ${PL}/FalsePosFor_merged_cov.bed.py ${j}.merged_cov_binomtest.bed ${FDR_SIMS} ${FDR_CUTOFF} > ${j}.merged_cov_binomtest_FDR.txt
+
+## calulate multiple FDR
+python ${PL}/FalsePosFor_merged_cov.bed.py ${j}.merged_cov_binomtest.bed ${FDR_SIMS} 0.1 > ${j}.merged_cov_binomtest_FDR_0.1.txt &
+python ${PL}/FalsePosFor_merged_cov.bed.py ${j}.merged_cov_binomtest.bed ${FDR_SIMS} 0.05 > ${j}.merged_cov_binomtest_FDR_0.05.txt &
+python ${PL}/FalsePosFor_merged_cov.bed.py ${j}.merged_cov_binomtest.bed ${FDR_SIMS} 0.01 > ${j}.merged_cov_binomtest_FDR_0.01.txt &
+
+
+## determine sym and biased use different FDR value
 awk 'NR==1 { print $0 } NR>1 && $9 <= thresh { print $0 }'  thresh=$(awk 'END {print $6}' ${j}.merged_cov_binomtest_FDR.txt) < ${j}.merged_cov_binomtest.bed | awk 'BEGIN {OFS="\t"} ($6>$7) {print $1, $2, $3, "M", $9, $4, $6, $7, $8}; ($6<$7){print $1, $2, $3, "P", $9, $4, $6, $7, $8}' > ${j}_interestingHets.bed
-awk 'NR==1 { print $0 } NR>1 && $9 <= thresh { print $0 }'  thresh=$(awk 'END {print $6}' ${j}.merged_cov_binomtest_FDR.txt) < ${j}.merged_cov_binomtest.bed | awk 'BEGIN {OFS="\t"} ($6>$7) {print $1, $2, $3, "M", $9, $4, $6, $7, $8}; ($6<$7){print $1, $2, $3, "P", $9, $4, $6, $7, $8}' > ${j}_AlleleBiased.bed
+awk 'NR==1 { print $0 } NR>1 && $9 <= thresh { print $0 }'  thresh=$(awk 'END {print $6}' ${j}.merged_cov_binomtest_FDR_0.01.txt) < ${j}.merged_cov_binomtest.bed | awk 'BEGIN {OFS="\t"} ($6>$7) {print $1, $2, $3, "M", $9, $4, $6, $7, $8}; ($6<$7){print $1, $2, $3, "P", $9, $4, $6, $7, $8}' > ${j}_AlleleBiased.bed
 # anything > FDR0.1, S
-awk 'NR==1 { print $0 } NR>1 && $9 > thresh { print $0 }'  thresh=$(awk 'END {print $6}' ${j}.merged_cov_binomtest_FDR.txt) < ${j}.merged_cov_binomtest.bed | awk 'BEGIN {OFS="\t"} {print $1, $2, $3, "S", $9, $4, $6, $7, $8}' > ${j}_AlleleSym.bed
+awk 'NR==1 { print $0 } NR>1 && $9 > thresh { print $0 }'  thresh=$(awk 'END {print $6}' ${j}.merged_cov_binomtest_FDR_0.1.txt) < ${j}.merged_cov_binomtest.bed | awk 'BEGIN {OFS="\t"} {print $1, $2, $3, "S", $9, $4, $6, $7, $8}' > ${j}_AlleleSym.bed
 
 head -n 1 ${j}_AlleleBiased.bed > ${j}_withAllele-specificity_FDR.bed
 cat ${j}_AlleleBiased.bed | awk 'NR>1 {print $0}' > tmp.bed
