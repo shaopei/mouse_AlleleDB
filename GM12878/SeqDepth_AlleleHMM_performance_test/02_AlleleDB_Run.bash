@@ -8,11 +8,13 @@
 #cd /workdir/sc2457/GM_GroSeq_AlleleDB_20170606/test_in_total/
 #ln -s /workdir/sc2457/SeqDepth_AlleleHMM_performance_test/PIPELINE_StrandSpecific.mk .
 
+dir_in_sc2457=/workdir/sc2457/SeqDepth_AlleleHMM_performance_test_2
+
 for file in SRR1552485_*.fastq.gz
 do 
 f=`echo ${file} | rev | cut -d . -f 3 |rev`
 echo $f
-cd /workdir/sc2457/SeqDepth_AlleleHMM_performance_test
+cd ${dir_in_sc2457}
 mkdir ${f}
 cd ${f}
 ln -s ../${f}.fastq.gz .
@@ -23,10 +25,10 @@ ${f} \
 NA12878_hg19_150109_w_transcriptome \
 /workdir/sc2457/alleleseq.gersteinlab.org/NA12878_diploid/NA12878_diploid_2015_feb5_3versions/1kgp3-svs-pass_NA12878_hg19_150109_w_transcriptome \
 /workdir/sc2457/SNP/1000genome_vol1.ftp.release.20130502/snp.calls.bed \
-/workdir/sc2457/SeqDepth_AlleleHMM_performance_test/${f} \
+${dir_in_sc2457}/${f} \
 ${f} \
 /workdir/sc2457/alleleDB/alleledb_pipeline \
-/workdir/sc2457/SeqDepth_AlleleHMM_performance_test/PIPELINE_StrandSpecific.mk \
+${dir_in_sc2457}/PIPELINE_StrandSpecific.mk \
 0.1 \
 ase \
 0 > ${f}_alleledb_strandSpecific_9.log  2>&1 &
