@@ -181,6 +181,7 @@ if [[ ${FLAG} -eq 2 || ${FLAG} -eq 0 ]] ; then
 	mkdir toremove
         mv ${FASTQ}.mat.bowtie.*_maternal.bed ${FASTQ}.mat.bowtie.*_maternal.bowtie toremove/.
 	mv ${FASTQ}.pat.bowtie.*_paternal.bed ${FASTQ}.pat.bowtie.*_paternal.bowtie toremove/.
+	gzip toremove/* &
 	
 	date >> 2-map.back.ref-${NAME}.log
 	
@@ -592,7 +593,8 @@ if [[ ${FLAG} -eq 9 || ${FLAG} -eq 0 ]] ; then
 
 	date >> 9-Strand-Specific-final-run.log
 	mkdir toremove
-	mv [1234567]* *.bowtietoremove/.
+	mv [1234567]* *.bowtie toremove/.
+	gzip toremove/* &
 fi
 
 
