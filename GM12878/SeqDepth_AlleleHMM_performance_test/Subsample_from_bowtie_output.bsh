@@ -1,0 +1,30 @@
+shuf -n N input > output
+
+
+wc -l SRR1552485_total.merged.bowtie_*
+  100914247 SRR1552485_total.merged.bowtie_minus
+  104555135 SRR1552485_total.merged.bowtie_plus
+          0 SRR1552485_total.merged.bowtie_question
+  205469382 total
+
+
+shuf -n 50000000  SRR1552485_total.merged.bowtie_minus > SRR1552485_50M.merged.bowtie_minus &
+shuf -n 50000000  SRR1552485_total.merged.bowtie_plus > SRR1552485_50M.merged.bowtie_plus &
+
+h=SRR1552485_50M
+for i in 25000000 12500000  6250000 3125000
+do
+shuf -n $i  ${h}.merged.bowtie_minus > SRR1552485_${i:0:3}.merged.bowtie_minus &
+shuf -n $i  ${h}.merged.bowtie_plus > SRR1552485_${i:0:3}.merged.bowtie_plus &
+h=SRR1552485_${i:0:3}
+wait
+done
+
+make -f PIPELINE_StrandSpecific_fromMergedBOWTIE.mk PREFIX=SRR1552485_12M
+
+
+for i in 50 25 12 6 3
+do
+make -f PIPELINE_StrandSpecific_fromMergedBOWTIE.mk PREFIX=SRR1552485_${i}M > SRR1552485_${i}M.log &
+done
+

@@ -1,0 +1,636 @@
+Min_count=1
+Max_Pvalue=1
+
+#locations of pipeline
+PL=/workdir/sc2457/tools/After_AlleleDB_pipeline
+
+
+
+# only anaysis autosome now
+grep -v X ${PREFIX}_counts_plus.txt > ${PREFIX}_counts_plus_noX.txt 
+grep -v X ${PREFIX}_counts_minus.txt > ${PREFIX}_counts_minus_noX.txt
+R --vanilla --slave --args $(pwd) ${PREFIX}_counts_plus_noX.txt ${Min_count} ${Max_Pvalue} < ${PL}/filter_counts_file.R 
+R --vanilla --slave --args $(pwd) ${PREFIX}_counts_minus_noX.txt ${Min_count} ${Max_Pvalue} < ${PL}/filter_counts_file.R 
+
+make_count_hmm () {
+  PREFIX=$1
+Input_counts_plus=${PREFIX}_counts_plus_noX_MinCount${Min_count}_MaxPvalue${Max_Pvalue}.txt
+Input_counts_minus=${PREFIX}_counts_minus_noX_MinCount${Min_count}_MaxPvalue${Max_Pvalue}.txt
+
+
+# use for hmm
+# $18 0.5 <= CNV <= 1.5
+p_value=0.05
+
+head ${Input_counts_plus} -n 1 |awk 'BEGIN{OFS="\t"} {print $1,$2,$19, $20, $21, "state"}' > ${PREFIX}_counts_plus_hmm.txt 
+cat ${Input_counts_plus} |\
+awk 'BEGIN{OFS="\t"} ($18 <1.5 && $18 >0.5) {print $1,$2,$19, $20, $21,$14,$15,$16}' |\
+awk -v p=$p_value 'BEGIN{OFS="\t"} ($8 <p) {print $1,$2,$3, $4, $5, $6}; ($8 >=p){print $1,$2,$3, $4, $5, "S"}' >> ${PREFIX}_counts_plus_hmm.txt 
+
+head ${Input_counts_minus} -n 1 |awk 'BEGIN{OFS="\t"} {print $1,$2,$19, $20, $21, "state"}' > ${PREFIX}_counts_minus_hmm.txt 
+cat ${Input_counts_minus} |\
+awk 'BEGIN{OFS="\t"} ($18 <1.5 && $18 >0.5) {print $1,$2,$19, $20, $21,$14,$15,$16}' |\
+awk -v p=$p_value 'BEGIN{OFS="\t"} ($8 <p) {print $1,$2,$3, $4, $5, $6}; ($8 >=p){print $1,$2,$3, $4, $5, "S"}' >> ${PREFIX}_counts_minus_hmm.txt 
+
+
+
+
+}
+
+for i in total 50M 25M 12M 6M 3M
+do
+make_count_hmm SRR1552485_${i} &
+done
+
+
+
+ln -s /workdir/sc2457/mouse_AlleleSpecific/allelicbias-PersonalGenome_P.CAST_M.B6-LEP_ZYG_ATGCA_forAlleleDB/Tm_Tp_fixed_redo/hmm_spc.py .
+
+#python hmm_spc.py counts_hmm.txt counts_plus_hmm.txt counts_minus_hmm.txt 22
+python AlleleHMM.py -p counts_plus_hmm.txt -m counts_minus_hmm.txt
+
+##
+PL=/workdir/sc2457/alleleDB/alleledb_pipeline
+MAPS=/workdir/sc2457/alleleseq.gersteinlab.org/NA12878_diploid/NA12878_diploid_2015_feb5_3versions/1kgp3-svs-pass_NA12878_hg19_150109_w_transcriptome/%s_NA12878.map
+PREFIX=SRR1552485_total
+#PREFIX=SRR1552485_subQ
+#PREFIX=SRR1552485_Sub20M
+PREFIX=SRR1552485_Sub4M
+MATBOWTIE=${PREFIX}.mat.bowtie
+PATBOWTIE=${PREFIX}.pat.bowtie
+FDR_SIMS=10
+FDR_CUTOFF=0.1
+
+
+# remove AMB reads and sort by index
+python ${PL}/filter_reads_out.py ${PATBOWTIE} - originalmatpatreads.toremove.ids | LC_ALL=C  sort -k1 -n  --parallel=30 -o ${PATBOWTIE}_AMBremoved_sorted &
+python ${PL}/filter_reads_out.py ${MATBOWTIE} - originalmatpatreads.toremove.ids | LC_ALL=C  sort -k1 -n  --parallel=30 -o ${MATBOWTIE}_AMBremoved_sorted &
+wait
+# seperate mat and pat reads from bowtie output
+# order matters! ${PATBOWTIE}_AMBremoved_sorted need to be in front of ${MATBOWTIE}_AMBremoved_sorted !!!
+python ${PL}/seperate_mat_pat_reads_withSNPs.py ${PATBOWTIE}_AMBremoved_sorted ${MATBOWTIE}_AMBremoved_sorted ${MAPS}
+# output is ${PATBOWTIE}_AMBremoved_sorted_specific.bowtie ${PATBOWTIE}_AMBremoved_sorted_identical.bowtie ${MATBOWTIE}_AMBremoved_sorted_specific.bowtie ${MAPS}
+
+#bowtie to bed
+  INPUT (bowtie output) 
+  col1: read_name              
+  col2: strand
+  col3: chr
+  col4: position (0-based)
+  col5: Read sequence (reverse-complemented if orientation is -).
+  col6: ASCII-encoded read qualities (reversed if orientation is -)
+  col7: 
+  col8: info
+  
+  Convert bowtie to bed file with the 4th col the ID and sequence of the read separated by "#*o*#"
+  position here is  0based
+  OUTPUT is UNsorted:
+  col1: chr
+  col2: chromStart(0based) 
+  col3: chrEnd(1based)	half open, chromStart=0, chromEnd=100, and span the bases numbered 0-99
+  col4: ID#*o*#sequence#*o*#strand#*o*#score
+  col5: 111
+  col6: strand
+
+#//for f in *_AMBremoved_sorted_specific.bowtie; 
+#//	do cat $f | awk 'BEGIN {FS= "\t"; OFS="\t"; t="#*o*#"; H=111 } {print $3, $4, $4+length($5), $1t$5t$2t$6, $H, $2}' > $f.bed
+#//done
+cat ${MATBOWTIE}_AMBremoved_sorted_specific.bowtie | awk 'BEGIN {FS= "\t"; OFS="\t"; t="#*o*#"} {print $3, $4, $4+length($5), $1t$5t$2t$6, 111, $2}' > ${MATBOWTIE}_AMBremoved_sorted_specific.bed &
+cat ${PATBOWTIE}_AMBremoved_sorted_specific.bowtie | awk 'BEGIN {FS= "\t"; OFS="\t"; t="#*o*#"} {print $3, $4, $4+length($5), $1t$5t$2t$6, 111, $2}' > ${PATBOWTIE}_AMBremoved_sorted_specific.bed &
+cat ${PATBOWTIE}_AMBremoved_sorted_identical.bowtie| awk 'BEGIN {FS= "\t"; OFS="\t"; t="#*o*#"} {print $3, $4, $4+length($5), $1t$5t$2t$6, 111, $2}' > ${PATBOWTIE}_AMBremoved_sorted_identical.bed &
+wait
+gzip *${PATBOWTIE}_AMBremoved_sorted_identical.bowtie &
+# liftOver to reference genome
+# usage: liftOver oldFile map.chain newFile unMapped
+
+ln -s 2-map.back.ref-${PREFIX}/pat2ref.chain .
+ln -s 2-map.back.ref-${PREFIX}/mat2ref.chain .
+liftOver ${MATBOWTIE}_AMBremoved_sorted_specific.bed mat2ref.chain  ${MATBOWTIE}_AMBremoved_sorted_specific.map2ref.bed ${MATBOWTIE}_AMBremoved_sorted_specific.unmap2ref.log &
+liftOver ${PATBOWTIE}_AMBremoved_sorted_specific.bed pat2ref.chain  ${PATBOWTIE}_AMBremoved_sorted_specific.map2ref.bed ${PATBOWTIE}_AMBremoved_sorted_specific.unmap2ref.log &
+liftOver ${PATBOWTIE}_AMBremoved_sorted_identical.bed pat2ref.chain  ${PATBOWTIE}_AMBremoved_sorted_identical.map2ref.bed ${PATBOWTIE}_AMBremoved_sorted_identical.unmap2ref.log 
+
+cat ${PATBOWTIE}_AMBremoved_sorted_identical.map2ref.bed | LC_ALL=C sort -k1,1V -k2,2n --parallel=30 |awk '{print "chr"$0}' |gzip > ${PATBOWTIE}_AMBremoved_sorted_identical.map2ref.sorted.bed.gz &
+
+# remove reads that DONOT overlape with a SNP in ${PATBOWTIE}_AMBremoved_sorted_specific.map2ref.sorted.bed and  ${MATBOWTIE}_AMBremoved_sorted_specific.map2ref.sorted.bed 
+intersectBed -sorted -u -a <(LC_ALL=C sort -k1,1V -k2,2n --parallel=30 ${MATBOWTIE}_AMBremoved_sorted_specific.map2ref.bed |awk '{print "chr"$0}') \
+-b /workdir/sc2457/SNP/1000genome_vol1.ftp.release.20130502/snp.calls.bed |gzip > ${MATBOWTIE}_AMBremoved_sorted_specific.map2ref.sorted.bed.gz &
+intersectBed -sorted -u -a <(LC_ALL=C sort -k1,1V -k2,2n --parallel=30 ${PATBOWTIE}_AMBremoved_sorted_specific.map2ref.bed |awk '{print "chr"$0}') \
+-b /workdir/sc2457/SNP/1000genome_vol1.ftp.release.20130502/snp.calls.bed |gzip > ${PATBOWTIE}_AMBremoved_sorted_specific.map2ref.sorted.bed.gz &
+wait
+rm ${MATBOWTIE}_AMBremoved_sorted_specific.bed ${PATBOWTIE}_AMBremoved_sorted_specific.bed ${PATBOWTIE}_AMBremoved_sorted_identical.bed
+rm ${PATBOWTIE}_AMBremoved_sorted_specific.map2ref.bed ${MATBOWTIE}_AMBremoved_sorted_specific.map2ref.bed ${PATBOWTIE}_AMBremoved_sorted_identical.map2ref.bed
+
+
+ln -s /workdir/sc2457/mouse_AlleleSpecific/allelicbias-PersonalGenome_P.CAST_M.B6-LEP_ZYG_ATGCA_forAlleleDB/Tm_Tp_fixed_redo/sum_of_counts.py .
+ln -s /workdir/sc2457/mouse_AlleleSpecific/allelicbias-PersonalGenome_P.CAST_M.B6-LEP_ZYG_ATGCA_forAlleleDB/Tm_Tp_fixed_redo/getFractionOfBlock_DistanceToNearestSites.R .
+ln -s /workdir/sc2457/tools/After_AlleleDB_pipeline/tss_paired_gm12878_plus.bed .
+ln -s /workdir/sc2457/tools/After_AlleleDB_pipeline/tss_paired_gm12878_minus.bed .
+
+### counts the maternal, paternal reads, and the reads that cannot tell where it from, in the regions of hmm predictions
+# perform BinomialTest and filter by FDR<= FDR_CUTOFF
+T=5
+for s in plus minus
+  #do for T in {1..9}
+  do f=counts_${s}_hmm_regions_t1e-0${T}.bed ; j=counts_${s}_hmm_regions_t1e-0${T}
+bedtools coverage -a <(cat $f | awk '{print "chr"$0}') -b <(zcat ${MATBOWTIE}_AMBremoved_sorted_specific.map2ref.sorted.bed.gz) -s | awk 'BEGIN {OFS="\t"; t="_"} {print $1t$2t$3, $0}' |LC_ALL=C sort -k1,1 --parallel=30 > ${j}.mat_cov.bed &
+bedtools coverage -a <(cat $f | awk '{print "chr"$0}') -b <(zcat ${PATBOWTIE}_AMBremoved_sorted_specific.map2ref.sorted.bed.gz) -s | awk 'BEGIN {OFS="\t"; t="_"} {print $1t$2t$3, $0}' |LC_ALL=C sort -k1,1 --parallel=30 > ${j}.pat_cov.bed &
+wait
+join -t $'\t' -j 1 -o 1.1,1.2,1.3,1.4,1.5,1.8,2.8 ${j}.mat_cov.bed ${j}.pat_cov.bed > ${j}.temp_cov.bed &
+bedtools coverage -a <(cat $f | awk '{print "chr"$0}') -b <(zcat ${PATBOWTIE}_AMBremoved_sorted_identical.map2ref.sorted.bed.gz) -s | awk 'BEGIN {OFS="\t"; t="_"} {print $1t$2t$3, $0}' |LC_ALL=C sort -k1,1 --parallel=30 > ${j}.iden_cov.bed &
+wait
+join -t $'\t' -j 1 -o 1.2,1.3,1.4,1.5,1.6,1.7,2.8 ${j}.temp_cov.bed ${j}.iden_cov.bed | LC_ALL=C sort -k1,1V -k2,2n --parallel=30 > ${j}.merged_cov.bed
+rm ${j}.temp_cov.bed ${j}.mat_cov.bed ${j}.pat_cov.bed ${j}.iden_cov.bed
+python ${PL}/BinomialTestFor_merged_cov.bed.py ${j}.merged_cov.bed ${j}.merged_cov_binomtest.bed
+rm ${j}.merged_cov.bed
+
+# output of BinomialTestFor_merged_cov.bed.py:(hmm+BinomialTest) if p-value <= 0.05, remain what it got from hmm (can ne M,P, or S), otherwise S.
+python ${PL}/FalsePosFor_merged_cov.bed.py ${j}.merged_cov_binomtest.bed ${FDR_SIMS} ${FDR_CUTOFF} > ${j}.merged_cov_binomtest_FDR.txt
+awk 'NR==1 { print $0 } NR>1 && $9 <= thresh { print $0 }'  thresh=$(awk 'END {print $6}' ${j}.merged_cov_binomtest_FDR.txt) < ${j}.merged_cov_binomtest.bed > ${j}_interestingHets.bed &
+done
+#done
+wait
+
+
+### make bed with only the 5prime head reads
+for f in counts_*_hmm_regions_t*_interestingHets.bed;
+  do echo $f
+j=`echo $f| rev | cut -d \. -f 2- |rev |cut -d _ -f 3-`
+strand=`echo $f|cut -d _ -f 2`
+echo $strand $j
+# filter and only keep M and P, use the state from hmm(hmm_state, Not hmm+BinomialTest ), which binomial test pass FDR <0.1
+if [ ${strand} == "minus" ]
+then cat counts_minus_${j}.bed | awk 'BEGIN {OFS="\t"; t=","; s="-";c="chr"} NR==1 { print $1,$2,$3,$4t$6t$7, 111, s} 
+NR>1 && $4!="S" {print $1,$3-1,$3,$4t$6t$7, 111, s}' > counts_minus_${j}_5head.bed
+bedtools closest -D a -a <(cat counts_minus_${j}_5head.bed | awk 'BEGIN {OFS="\t"} NR!=1 {print $0}' | LC_ALL=C sort -k1,1 -k2,2n --parallel=30) -b tss_paired_gm12878_minus.bed \
+|awk '($NF<0){print $NF*(-1)}; ($NF>=0) {print $NF}' > counts_${j}_5head_distance_toclosest-dReg_Counts.tmp
+
+else
+cat counts_plus_${j}.bed | awk 'BEGIN {OFS="\t"; t=","; s="+";c="chr"} NR==1 { print $1,$2,$3,$4t$6t$7, 111, s} 
+NR>1 && $4!="S"  {print $1,$2,$2+1,$4t$6t$7, 111, s}' > counts_plus_${j}_5head.bed
+bedtools closest -D a -a <(cat counts_plus_${j}_5head.bed | awk 'BEGIN {OFS="\t"} NR!=1 {print $0}' | LC_ALL=C sort -k1,1 -k2,2n --parallel=30) -b tss_paired_gm12878_plus.bed \
+|awk '($NF<0){print $NF*(-1)}; ($NF>=0) {print $NF}' >>  counts_${j}_5head_distance_toclosest-dReg_Counts.tmp
+fi
+cat counts_${j}_5head_distance_toclosest-dReg_Counts.tmp | LC_ALL=C sort --temporary-directory=/workdir/sc2457/tmp/ --parallel=10 -n | uniq -c > counts_${j}_5head_distance_toclosest-dReg_Counts.txt
+rm counts_${j}_5head_distance_toclosest-dReg_Counts.tmp
+
+# distance to the closet upstream dReg sites.
+# -D a Report distance with respect to A.
+# -id Ignore features in B that are downstream of features in A. 
+# check both end, no id
+#bedtools closest -D a -a <(cat counts_${j}_5head.bed | awk 'BEGIN {OFS="\t"} NR!=1 {print $0}' | LC_ALL=C sort -k1,1 -k2,2n --parallel=30) -b LEP_ZYG_ATGCA.dREG.peak.score.bed.gz \
+#|awk '($13<0){print $13*(-1)}; ($13>=0) {print $13}' | LC_ALL=C sort --temporary-directory=/workdir/sc2457/tmp/ --parallel=10 -n | uniq -c >  counts_${j}_5head_distance_toclosest-dReg_Counts.txt
+
+python sum_of_counts.py counts_${j}_5head_distance_toclosest-dReg_Counts.txt `awk 'END {print $2}' counts_${j}_5head_distance_toclosest-dReg_Counts.txt` > counts_${j}_5head_distance_toclosest-dReg_AccumulateCounts.txt 
+
+done
+
+
+### make figures
+R --vanilla --slave --args $(pwd) "counts_hmm_regions_t*_interestingHets_5head_distance_toclosest-dReg_AccumulateCounts.txt" counts_hmm_regions_tX_interestingHets_5head_distance_toclosest-dReg_AccumulateCounts.pdf counts_hmm_regions_tX_interestingHets_5head_distance_toclosest-dReg_At5Kb.pdf < getFractionOfBlock_DistanceToNearestSites.R
+# pick t1e-06 for GM12878
+
+####END of analysis ######
+
+#### find concordant and discordant regions
+# keep fdr <= 0.1 and state is P or M, 
+# this can also used for IGV viewing
+T=5
+cat counts_minus_hmm_regions_t1e-0${T}_interestingHets.bed | awk 'BEGIN {OFS="\t"; t=","; s="-";c="chr"} NR==1 { print $1,$2,$3,$4t$6t$7, 111, s} 
+NR>1 && $4!="S"  {print $1,$2,$3,$4t$6t$7, 111, s}' > counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed
+
+cat counts_plus_hmm_regions_t1e-0${T}_interestingHets.bed | awk 'BEGIN {OFS="\t"; t=","; s="+";c="chr"} NR==1 { print $1,$2,$3,$4t$6t$7, 111, s} 
+NR>1 && $4!="S"  {print $1,$2,$3,$4t$6t$7, 111, s}' > counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed
+
+cat counts_minus_hmm_regions_t1e-0${T}.merged_cov_binomtest.bed | awk 'BEGIN {OFS="\t"; t=","; s="-"} NR==1 { print $1,$2,$3,$4t$6t$7, 111, s} 
+NR>1  {print $1,$2,$3,$4t$6t$7, 111, s}' > counts_minus_hmm_regions_t1e-0${T}.merged_cov_binomtest_IGV.bed
+cat counts_plus_hmm_regions_t1e-0${T}.merged_cov_binomtest.bed | awk 'BEGIN {OFS="\t"; t=","; s="+"} NR==1 { print $1,$2,$3,$4t$6t$7, 111, s} 
+NR>1  {print $1,$2,$3,$4t$6t$7, 111, s}' > counts_plus_hmm_regions_t1e-0${T}.merged_cov_binomtest_IGV.bed
+
+
+counts_plus_hmm_regions_t1e-05.merged_cov_binomtest.bed
+
+# identify regions intersect with tss +- 150bp
+## sort Tss regions, only need to do once
+#cat tss_paired_gm12878_plus.bed |LC_ALL=C sort --temporary-directory=/workdir/sc2457/tmp/ --parallel=10 -V |awk '{OFS="\t"} {print $1,$2,$3,$4,NR,$6}' > tss_paired_gm12878_plus_Vsorted.bed
+#cat tss_paired_gm12878_minus.bed |LC_ALL=C sort --temporary-directory=/workdir/sc2457/tmp/ --parallel=10 -V |awk '{OFS="\t"} {print $1,$2,$3,$4,NR,$6}'> tss_paired_gm12878_minus_Vsorted.bed
+
+
+T=5
+#paste <(bedtools closest -iu -D a -a tss_paired_gm12878_plus_Vsorted.bed -b counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed) <(bedtools closest -iu -D a -a tss_paired_gm12878_minus_Vsorted.bed -b counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed) \
+#|awk '($13 != -1 && $NF !=-1 && $13<=150 && $NF<=150) {print substr($10,1,1), substr($23,1,1)}' | awk '($1 == $2){print $0} '
+# Concordant 
+join -t $'\t' -j 5 -o 1.1,1.2,1.3,1.10,1.13,2.1,2.2,2.3,2.10,2.13 <(bedtools closest -iu -D a -a tss_paired_gm12878_plus_Vsorted.bed -b counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed) <(bedtools closest -iu -D a -a tss_paired_gm12878_minus_Vsorted.bed -b counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed) |awk '($5 != -1 && $10 !=-1 && $5<=150 && $10<=150) {print $0}' | awk '(substr($4,1,1) == substr($9,1,1)){print $0} ' | wc -l
+# Discordant 
+join -t $'\t' -j 5 -o 1.1,1.2,1.3,1.10,1.13,2.1,2.2,2.3,2.10,2.13 <(bedtools closest -iu -D a -a tss_paired_gm12878_plus_Vsorted.bed -b counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed) <(bedtools closest -iu -D a -a tss_paired_gm12878_minus_Vsorted.bed -b counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed) |awk '($5 != -1 && $10 !=-1 && $5<=150 && $10<=150) {print $0}' | awk '(substr($4,1,1) != substr($9,1,1)){print $0} ' | wc -l
+
+
+
+
+bedtools closest -D a -a <(cat counts_plus_${j}_5head.bed | awk 'BEGIN {OFS="\t"} NR!=1 {print $0}' | LC_ALL=C sort -k1,1 -k2,2n --parallel=30) -b tss_paired_gm12878_plus.bed \
+|awk '($13<0){print $13*(-1)}; ($13>=0) {print $13}' >>  counts_${j}_5head_distance_toclosest-dReg_Counts.tmp
+
+
+
+#### 
+# how many SNPs were covered by 
+T=5
+intersectBed -sorted -u -a /workdir/sc2457/SNP/1000genome_vol1.ftp.release.20130502/snp.calls.bed -b counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed|wc -l
+#148158
+intersectBed -sorted -u -a /workdir/sc2457/SNP/1000genome_vol1.ftp.release.20130502/snp.calls.bed -b counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed|wc -l
+#139481
+
+
+# how many SNPs (with at least 1 read mapped) were cover by counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed and counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed
+cd /workdir/sc2457/GM_GroSeq_AlleleDB_20170606/test_in_total/AlleleHMM_result
+T=5
+#GM
+intersectBed -sorted -u -a <(cat counts_plus_noX_MinCount1_MaxPvalue1_IGV.bed| awk '{print "chr"$0}') -b counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed|wc -l
+#16867
+intersectBed -sorted -u -a  <(cat counts_minus_noX_MinCount1_MaxPvalue1_IGV.bed| awk '{print "chr"$0}') -b counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed|wc -l
+#15732
+
+#F1
+cd /workdir/sc2457/mouse_AlleleSpecific/allelicbias-PersonalGenome_P.CAST_M.129S1-SRR4041366_dedup_2/AlleleHMM
+intersectBed -sorted -u -a counts_plus_noX_MinCount1_MaxPvalue1.bed -b counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed|wc -l
+#74723
+intersectBed -sorted -u -a counts_minus_noX_MinCount1_MaxPvalue1.bed -b counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed|wc -l
+#78820
+
+
+
+
+cat tss_all_gm12878.bed |LC_ALL=C sort --temporary-directory=/workdir/sc2457/tmp/ --parallel=10 -V > tss_all_gm12878_Vsorted.bed
+cat tss_paired_gm12878_minus.bed |LC_ALL=C sort --temporary-directory=/workdir/sc2457/tmp/ --parallel=10 -V > tss_paired_gm12878_minus_Vsorted.bed
+cat tss_paired_gm12878_plus.bed |LC_ALL=C sort --temporary-directory=/workdir/sc2457/tmp/ --parallel=10 -V > tss_paired_gm12878_plus_Vsorted.bed
+zcat SRR1552485.dREG.peak.score.bed.gz | LC_ALL=C sort --temporary-directory=/workdir/sc2457/tmp/ --parallel=10 -V > SRR1552485.dREG.peak.score.bed
+
+# how many TSSs in all blocks? 
+#GM
+intersectBed -sorted -u -a tss_all_gm12878_Vsorted.bed -b counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed -s|wc -l
+2672
+intersectBed -sorted -u -a tss_all_gm12878_Vsorted.bed -b counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed -s|wc -l
+2796
+
+# how many TSSs in each blocks?
+#GM
+intersectBed -sorted -a tss_all_gm12878_Vsorted.bed -b counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed -s -wb| cut -f 7-10 |uniq -c > counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV_tssallPerBlock.txt
+intersectBed -sorted -a tss_all_gm12878_Vsorted.bed -b counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed -s -wb| cut -f 7-10 |uniq -c > counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV_tssallPerBlock.txt
+
+
+# how many TSSs in each blocks?
+#F1
+TSS_bed=SRR1552485.dREG.peak.score.bed
+intersectBed -sorted -a ${TSS_bed} -b counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed -wb| cut -f 5-8 |uniq -c > counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV_dRegPeakPerBlock.txt
+intersectBed -sorted -a ${TSS_bed} -b counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed -wb| cut -f 5-8 |uniq -c > counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV_dRegPeakPerBlock.txt
+
+
+
+###https://github.com/shaopei/mouse_AlleleDB/blob/master/GM12878/TssInBlocks/Stats_of_HMM_block_forManuscript.R
+
+
+## SRR4041366_dedup_2
+
+
+cd /workdir/sc2457/mouse_AlleleSpecific/allelicbias-PersonalGenome_P.CAST_M.129S1-SRR4041366_dedup_2/AlleleHMM
+
+cat counts_minus_hmm_regions_t1e-0${T}_interestingHets.bed | awk 'BEGIN {OFS="\t"; t=","; s="-";c="chr"} NR==1 { print $1,$2,$3,$4t$6t$7, 111, s} 
+NR>1 && $4!="S"  {print c$1,$2,$3,$4t$6t$7, 111, s}' > counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed
+cat counts_plus_hmm_regions_t1e-0${T}_interestingHets.bed | awk 'BEGIN {OFS="\t"; t=","; s="+";c="chr"} NR==1 { print $1,$2,$3,$4t$6t$7, 111, s} 
+NR>1 && $4!="S"  {print c$1,$2,$3,$4t$6t$7, 111, s}' > counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed
+
+# how many allele-biased AlleleHMM block with FDR<=0.1
+wc -l counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed
+#1725 counts_plus_hmm_regions_t1e-05_interestingHets_IGV.bed
+wc -l counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed
+#1757 counts_minus_hmm_regions_t1e-05_interestingHets_IGV.bed
+
+# how many TSSs in each blocks?
+zcat SRR4041366.dREG.peak.score.bed.gz |LC_ALL=C sort --temporary-directory=/workdir/sc2457/tmp/ --parallel=10 -V > SRR4041366.dREG.peak.score.bed
+TSS_bed=SRR4041366.dREG.peak.score.bed
+intersectBed -sorted -a ${TSS_bed} -b counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed -wb| cut -f 5-8 |uniq -c > counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV_dRegPeakPerBlock.txt
+intersectBed -sorted -a ${TSS_bed} -b counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed -wb| cut -f 5-8 |uniq -c > counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV_dRegPeakPerBlock.txt
+
+
+#How many SNPs in significant AlleleHMM blocks in total?
+unfiltered_snp=/workdir/sc2457/mouse_AlleleSpecific/mouse_genome.sanger.ac.uk/REL-1505-SNPs_Indels/PersonalGenome_P.CAST_M.129S1_indelsNsnps_CAST.subsample.bam/P.CAST_M.129S1_indelsNsnps_CAST.subsample.bam.snp.unfiltered
+cat ${unfiltered_snp} |awk '{OFS="\t"; c="chr"}{print c$1, $2-1, $2, $6 }' > temp.snp.bed
+intersectBed -sorted -u -a temp.snp.bed -b counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed|wc -l
+#2629178
+intersectBed -sorted -u -a temp.snp.bed -b counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed|wc -l
+#
+mkdir toremove
+mv t_p temp.snp.bed toremove/.
+
+
+
+##How many gene in each blocks #####
+# F1
+gtf2bed < gencode.vM17.annotation.gtf > gencode.vM17.annotation.bed
+cd /workdir/sc2457/mouse_AlleleSpecific/allelicbias-PersonalGenome_P.CAST_M.129S1-SRR4041366_dedup_2/AlleleHMM
+ln -s /workdir/sc2457/gencode/mm10_GRCm38/gencode.vM17.annotation.bed .
+
+
+
+#cat gencode.vM17.annotation.bed | cut -f 1-8 |awk 'BEGIN {OFS="\t"} ($8=="transcript"){print $0}' |LC_ALL=C sort --temporary-directory=/workdir/sc2457/tmp/ --parallel=10 -V  > gencode.vM17.annotation_transcript.bed
+cat gencode.vM17.annotation_transcript.bed | awk 'BEGIN {OFS="\t"} ($6=="+") {print $1,$2,$3,$4,"111",$6}' > gencode.vM17.annotation_transcript_plus.bed
+cat gencode.vM17.annotation_transcript.bed| awk 'BEGIN {OFS="\t"} ($6=="-") {print $1,$2,$3,$4,"111",$6}' > gencode.vM17.annotation_transcript_minus.bed
+
+
+#Gene_bed=gencode.vM17.annotation_transcript.bed
+#intersectBed -sorted -a ${Gene_bed} -b counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed -s -wo| awk 'BEGIN {FS="\t";OFS="\t"} { print $4, $5, $6,$7, $8, $9,$10,$11,$12}' |LC_ALL=C sort --temporary-directory=/workdir/sc2457/tmp/ --parallel=10 -V| uniq |cut -f 6-9 |LC_ALL=C sort --temporary-directory=/workdir/sc2457/tmp/ --parallel=10 -V| uniq -c > counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV_genePerBlock.txt
+#intersectBed -sorted -a ${Gene_bed} -b counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed -s -wo| awk 'BEGIN {FS="\t";OFS="\t"} { print $4, $5, $6,$7, $8, $9,$10,$11,$12}'|LC_ALL=C sort --temporary-directory=/workdir/sc2457/tmp/ --parallel=10 -V| uniq |cut -f 6-9 |LC_ALL=C sort --temporary-directory=/workdir/sc2457/tmp/ --parallel=10 -V| uniq -c >  counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV_genePerBlock.txt
+
+# above still multiple count genes share similarl location, need to merge bed of overlaping genes zs follows:
+cat gencode.vM17.annotation.bed | cut -f 1-8 |awk 'BEGIN {OFS="\t"} ($8=="gene"){print $0}' |LC_ALL=C sort --temporary-directory=/workdir/sc2457/tmp/ --parallel=10 -V  > gencode.vM17.annotation_gene.bed
+bedtools merge -i gencode.vM17.annotation_gene.bed -s -o collapse,distinct,distinct  -c 4,5,6 |awk 'BEGIN {OFS="\t"; a="111"} {print $1,$2,$3,$4,a,$6}'|LC_ALL=C sort --temporary-directory=/workdir/sc2457/tmp/ --parallel=10 -V > gencode.vM17.annotation_geneMerged.bed
+cat gencode.vM17.annotation_geneMerged.bed | awk 'BEGIN {OFS="\t"} ($6=="+") {print $1,$2,$3,$4,$5,$6}' > gencode.vM17.annotation_geneMerged_plus.bed
+cat gencode.vM17.annotation_geneMerged.bed | awk 'BEGIN {OFS="\t"} ($6=="-") {print $1,$2,$3,$4,$5,$6}' > gencode.vM17.annotation_geneMerged_minus.bed
+
+# how many genes in EACH hmm blocks?
+Gene_bed=gencode.vM17.annotation_geneMerged.bed
+intersectBed -sorted -a ${Gene_bed} -b counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed -s -wb| cut -f 7-10 |uniq -c > counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV_genePerBlock.txt
+intersectBed -sorted -a ${Gene_bed} -b counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed -s -wb| cut -f 7-10 |uniq -c > counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV_genePerBlock.txt
+
+#how many blocks contain genes?
+wc -l counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV_genePerBlock.txt
+wc -l counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV_genePerBlock.txt
+
+
+
+#GM
+gzip -d gencode.v28lift37.annotation.gtf.gz
+gtf2bed < gencode.v28lift37.annotation.gtf > gencode.v28lift37.annotation.bed
+gzip gencode.v28lift37.annotation.gtf &
+cd /workdir/sc2457/GM_GroSeq_AlleleDB_20170606/test_in_total/AlleleHMM_result
+ln -s /workdir/sc2457/gencode/hg19_GRCh37/gencode.v28lift37.annotation.bed .
+
+# how many genes in EACH hmm blocks?
+cat gencode.v28lift37.annotation.bed |grep chr| cut -f 1-8 |awk 'BEGIN {OFS="\t"} ($8=="gene"){print $0}' |LC_ALL=C sort --temporary-directory=/workdir/sc2457/tmp/ --parallel=10 -V  > gencode.v28lift37.annotation_gene.bed
+bedtools merge -i gencode.v28lift37.annotation_gene.bed -s -o collapse,distinct,distinct  -c 4,5,6 |awk 'BEGIN {OFS="\t"; a="111"} {print $1,$2,$3,$4,a,$6}' |LC_ALL=C sort --temporary-directory=/workdir/sc2457/tmp/ --parallel=10 -V > gencode.v28lift37.annotation_geneMerged.bed
+Gene_bed=gencode.v28lift37.annotation_geneMerged.bed
+intersectBed -sorted -a ${Gene_bed} -b counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed -s -wb| cut -f 7-10 |uniq -c > counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV_genePerBlock.txt
+intersectBed -sorted -a ${Gene_bed} -b counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed -s -wb| cut -f 7-10 |uniq -c > counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV_genePerBlock.txt
+
+
+### caluate gene size using genecode data.
+cat gencode.v28lift37.annotation_geneMerged.bed | awk ' {print $3-$2 }' > gencode.v28lift37.annotation_geneMerged_size.txt
+cat gencode.vM17.annotation_geneMerged.bed  | awk ' {print $3-$2 }' >  gencode.vM17.annotation_geneMerged_size.txt
+
+## How many SNPs per gene using GENECODE annotation (merged gene)
+#F1
+unfiltered_snp=/workdir/sc2457/mouse_AlleleSpecific/mouse_genome.sanger.ac.uk/REL-1505-SNPs_Indels/PersonalGenome_P.CAST_M.129S1_indelsNsnps_CAST.subsample.bam/P.CAST_M.129S1_indelsNsnps_CAST.subsample.bam.snp.unfiltered
+cat ${unfiltered_snp} |awk '{OFS="\t"; c="chr"}{print c$1, $2-1, $2, $6 }' > temp.snp.bed
+intersectBed -sorted -a temp.snp.bed -b gencode.vM17.annotation_geneMerged.bed -wb | cut -f 5-8 |LC_ALL=C  sort --parallel=30|uniq -c  > gencode.vM17.annotation_geneMerged_SNPCount.txt
+intersectBed -sorted -a temp.snp.bed -b gencode.vM17.annotation_gene.bed -wb | cut -f 5-8 |LC_ALL=C  sort --parallel=30|uniq -c  > gencode.vM17.annotation_gene_SNPCount.txt
+
+#GM
+snp_bed=/workdir/sc2457/SNP/1000genome_vol1.ftp.release.20130502/snp.calls.bed
+intersectBed -sorted -a ${snp_bed} -b gencode.v28lift37.annotation_geneMerged.bed -wb | cut -f 5-8 |LC_ALL=C  sort --parallel=30|uniq -c  > gencode.v28lift37.annotation_geneMerged_SNPCount.txt
+intersectBed -sorted -a ${snp_bed} -b gencode.v28lift37.annotation_gene.bed -wb | cut -f 5-8 |LC_ALL=C  sort --parallel=30|uniq -c  > gencode.v28lift37.annotation_gene_SNPCount.txt
+
+
+# how many AlleleDB significant SNPs overlap with AlleleHMM blocks?
+#GM
+intersectBed -sorted -a <(cat ../interestingHets_plus.txt | awk '{OFS="\t"} (NR>1){print "chr"$1, $2-1, $2}') -b counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed |wc -l
+intersectBed -sorted -a <(cat ../interestingHets_minus.txt | awk '{OFS="\t"} (NR>1){print "chr"$1, $2-1, $2}') -b counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed |wc -l
+#F1
+intersectBed -sorted -a ../interestingHets_plus_MinCount1_MaxPvalue1.bed -b counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed |wc -l
+intersectBed -sorted -a ../interestingHets_minus_MinCount1_MaxPvalue1.bed -b counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed |wc -l
+
+
+##### calcultae False discover of AlleleDB using gene annotation  ####
+
+### counts the maternal, paternal reads, and the reads that cannot tell where it from, in the regions the bed file
+# perform BinomialTest and filter by FDR<= FDR_CUTOFF
+# the allele-specificity of genes
+ln -s /workdir/sc2457/mouse_AlleleSpecific/allelicbias-PersonalGenome_P.CAST_M.B6-LEP_ZYG_ATGCA_forAlleleDB/Tm_Tp_fixed_redo/sum_of_counts.py .
+ln -s /workdir/sc2457/mouse_AlleleSpecific/allelicbias-PersonalGenome_P.CAST_M.B6-LEP_ZYG_ATGCA_forAlleleDB/Tm_Tp_fixed_redo/getFractionOfBlock_DistanceToNearestSites.R .
+
+#GM
+PL=/workdir/sc2457/alleleDB/alleledb_pipeline
+#f=gencode.v28lift37.annotation_geneMerged_wAlleleDB.bed
+#j=gencode.v28lift37.annotation_geneMerged_wAlleleDB
+f=gencode.v28lift37.annotation_geneMerged.bed
+j=gencode.v28lift37.annotation_geneMerged
+PREFIX=SRR1552485_total
+MATBOWTIE=${PREFIX}.mat.bowtie
+PATBOWTIE=${PREFIX}.pat.bowtie
+bedtools coverage -a $f -b <(zcat ${MATBOWTIE}_AMBremoved_sorted_specific.map2ref.sorted.bed.gz) -s | awk 'BEGIN {OFS="\t"; t="_"} {print $1t$2t$3t$6, $0}' |LC_ALL=C sort -k1,1 --parallel=30 > ${j}.mat_cov.bed &
+bedtools coverage -a $f -b <(zcat ${PATBOWTIE}_AMBremoved_sorted_specific.map2ref.sorted.bed.gz) -s | awk 'BEGIN {OFS="\t"; t="_"} {print $1t$2t$3t$6, $0}' |LC_ALL=C sort -k1,1 --parallel=30 > ${j}.pat_cov.bed &
+wait
+join -t $'\t' -j 1 -o 1.1,1.2,1.3,1.4,1.5,1.8,2.8 ${j}.mat_cov.bed ${j}.pat_cov.bed > ${j}.temp_cov.bed &
+bedtools coverage -a $f -b <(zcat ${PATBOWTIE}_AMBremoved_sorted_identical.map2ref.sorted.bed.gz) -s | awk 'BEGIN {OFS="\t"; t="_"} {print $1t$2t$3t$6, $0}' |LC_ALL=C sort -k1,1 --parallel=30 > ${j}.iden_cov.bed &
+wait
+join -t $'\t' -j 1 -o 1.1,1.2,1.3,1.4,1.5,1.6,1.7,2.8 ${j}.temp_cov.bed ${j}.iden_cov.bed | LC_ALL=C sort -k1,2V -k2,3n --parallel=30 > ${j}.merged_cov.bed
+mv ${j}.temp_cov.bed ${j}.mat_cov.bed ${j}.pat_cov.bed ${j}.iden_cov.bed toremove
+
+mv ${j}.merged_cov.bed ${j}.merged_cov.bed_temp
+cat ${j}.merged_cov.bed_temp | awk 'BEGIN{OFS="\t"} {split($1,a,"_"); print $2, $3, $4, a[4], $6, $7, $8, $5}' > ${j}.merged_cov.bed
+
+python ${PL}/BinomialTestFor_merged_cov.bed.py ${j}.merged_cov.bed ${j}.merged_cov_binomtest.bed
+mv ${j}.merged_cov.bed ${j}.merged_cov.bed_temp toremove
+# output of BinomialTestFor_merged_cov.bed.py:(hmm+BinomialTest) if p-value <= 0.05, remain what it got from hmm (can ne M,P, or S), otherwise S.
+python ${PL}/FalsePosFor_merged_cov.bed.py ${j}.merged_cov_binomtest.bed ${FDR_SIMS} ${FDR_CUTOFF} > ${j}.merged_cov_binomtest_FDR.txt
+awk 'NR==1 { print $0 } NR>1 && $9 <= thresh { print $0 }'  thresh=$(awk 'END {print $6}' ${j}.merged_cov_binomtest_FDR.txt) < ${j}.merged_cov_binomtest.bed | awk 'BEGIN {OFS="\t"} ($6>$7) {print $1, $2, $3, "M", $9, $4, $6, $7, $8}; ($6<$7){print $1, $2, $3, "P", $9, $4, $6, $7, $8}' > ${j}_interestingHets.bed
+
+
+#GM
+cd /workdir/sc2457/GM_GroSeq_AlleleDB_20170606/test_in_total
+Max_Pvalue=1
+#locations of pipeline
+PL=/workdir/sc2457/tools/After_AlleleDB_pipeline
+
+# filter input files based on Min reads count and Max P-value
+R --vanilla --slave --args $(pwd) interestingHets_plus.txt ${Min_count} ${Max_Pvalue} < ${PL}/filter_counts_file.R 
+R --vanilla --slave --args $(pwd) interestingHets_minus.txt ${Min_count} ${Max_Pvalue} < ${PL}/filter_counts_file.R 
+# make bed files
+Input_counts_plus=interestingHets_plus_MinCount1_MaxPvalue1
+Input_counts_minus=interestingHets_minus_MinCount1_MaxPvalue1
+
+cat ${Input_counts_plus}.txt |\
+awk 'BEGIN{OFS="\t"} {print $1,$2,$19, $20, $21,$14,$15,$16}' |\
+awk 'BEGIN{OFS="\t"} (NR>1) {print $1,$2-1, $2 ,$3, $4, $5, $6} ; (NR==1){print "#"$1,$2-1, $2 ,$3, $4, $5, $6} ' > ${Input_counts_plus}.bed
+
+cat ${Input_counts_minus}.txt |\
+awk 'BEGIN{OFS="\t"} {print $1,$2,$19, $20, $21,$14,$15,$16}' |\
+awk 'BEGIN{OFS="\t"} (NR>1) {print $1,$2-1, $2 ,$3, $4, $5, $6} ; (NR==1){print "#"$1,$2-1, $2 ,$3, $4, $5, $6} ' > ${Input_counts_minus}.bed
+
+
+### How many signifcant AlleleDB SNPs within gene annotation?
+#GM
+cd AlleleHMM_result
+## AlleleDB SNPs within gene annotation in -b
+intersectBed -sorted -u -s -a <(cat ../${Input_counts_plus}.bed|awk 'BEGIN{OFS="\t"} (NR>1) {print "chr"$1, $2, $3, $4, $5, "+"}') -b gencode.v28lift37.annotation_geneMerged.bed |wc -l
+#34756
+intersectBed -sorted -u -s -a <(cat ../${Input_counts_minus}.bed|awk 'BEGIN{OFS="\t"} (NR>1) {print "chr"$1, $2, $3, $4, $5, "-"}') -b gencode.v28lift37.annotation_geneMerged.bed |wc -l
+#30986
+
+#intersectBed -sorted -s -wb -a <(cat ../${Input_counts_plus}.bed|awk 'BEGIN{OFS="\t"; t=","} (NR>1) {print "chr"$1, $2, $3, $4t$5, $7, "+"}') -b gencode.v28lift37.annotation_geneMerged.bed 
+
+
+## seperate AlleleDB results to (overlap with AlleleHMM) & (Not overlap with AlleleHMM)
+#GM
+T=5
+intersectBed -sorted -s -a <(cat ../${Input_counts_plus}.bed|awk 'BEGIN{OFS="\t"} (NR>1) {print "chr"$1, $2, $3, $4, $5, "+", $7}') -b counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed > ${Input_counts_plus}_inAlleleHMM.bed
+intersectBed -sorted -s -a <(cat ../${Input_counts_minus}.bed|awk 'BEGIN{OFS="\t"} (NR>1) {print "chr"$1, $2, $3, $4, $5, "-", $7}') -b counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed > ${Input_counts_minus}_inAlleleHMM.bed
+intersectBed -sorted -v -s -a <(cat ../${Input_counts_plus}.bed|awk 'BEGIN{OFS="\t"} (NR>1) {print "chr"$1, $2, $3, $4, $5, "+", $7}') -b counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed > ${Input_counts_plus}_NotInAlleleHMM.bed
+intersectBed -sorted -v -s -a <(cat ../${Input_counts_minus}.bed|awk 'BEGIN{OFS="\t"} (NR>1) {print "chr"$1, $2, $3, $4, $5, "-", $7}') -b counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed > ${Input_counts_minus}_NotInAlleleHMM.bed
+
+
+
+# only calculate the gene annotations with AlleleDB significant SNPs (Do not use)
+# intersectBed -sorted -s -u -a gencode.v28lift37.annotation_geneMerged.bed -b <(cat ../${Input_counts_plus}.bed|awk 'BEGIN{OFS="\t"} (NR>1) {print "chr"$1, $2, $3, $4, $5, "+", $7}')  > gencode.v28lift37.annotation_geneMerged_wAlleleDB.bed
+# intersectBed -sorted -s -u -a gencode.v28lift37.annotation_geneMerged.bed -b <(cat ../${Input_counts_minus}.bed|awk 'BEGIN{OFS="\t"} (NR>1) {print "chr"$1, $2, $3, $4, $5, "-", $7}')  >> gencode.v28lift37.annotation_geneMerged_wAlleleDB.bed
+
+
+#Input_counts_plus=interestingHets_plus_MinCount1_MaxPvalue1
+#Input_counts_minus=interestingHets_minus_MinCount1_MaxPvalue1
+# how many allele-specific SNPs consistent with the gene allele-specificity?
+for h in ${Input_counts_plus} ${Input_counts_minus}
+do
+# overlap between AlleleDB, AlleleHMM, and allele-specific gene annotation
+intersectBed -sorted -s -wb -a ${h}_inAlleleHMM.bed -b ${j}_interestingHets.bed > ${h}_inAlleleHMM_geneMP.bed
+
+# overlap between AlleleDB, AlleleHMM, and all gene annotation
+intersectBed -sorted -s -u -a ${h}_inAlleleHMM.bed -b ${j}.bed > ${h}_inAlleleHMM_inGene.bed
+
+# overlap between AlleleDB, AlleleHMM, and symmetric gene annotation
+intersectBed -sorted -s -u -a <(intersectBed -sorted -s -wb -v -a ${h}_inAlleleHMM.bed -b ${j}_interestingHets.bed) -b gencode.v28lift37.annotation_geneMerged.bed > ${h}_inAlleleHMM_geneS.bed
+
+
+intersectBed -sorted -s -wb -a ${h}_NotInAlleleHMM.bed -b ${j}_interestingHets.bed > ${h}_NotInAlleleHMM_geneMP.bed
+intersectBed -sorted -s -u -a ${h}_NotInAlleleHMM.bed -b ${j}.bed > ${h}_NotInAlleleHMM_inGene.bed
+intersectBed -sorted -s -u -a <(intersectBed -sorted -s -wb -v -a ${h}_NotInAlleleHMM.bed -b ${j}_interestingHets.bed) -b gencode.v28lift37.annotation_geneMerged.bed > ${h}_NotInAlleleHMM_geneS.bed
+
+done
+
+for f in *_geneMP.bed
+do 
+echo $f
+#printf "# of SNPs:"
+#cat $f |wc -l
+
+printf "Concordant with Gene:"
+cat $f | awk 'BEGIN{OFS="\t"} ($7==$11) {print $0}' |wc -l
+printf "Discordant with Gene:"
+cat $f | awk 'BEGIN{OFS="\t"} ($7!=$11) {print $0}' |wc -l
+
+fh=`echo $f|rev|cut -d _ -f 2-|rev`
+printf "In gene:"
+cat ${fh}_inGene.bed |wc -l
+done
+
+# the read counts at Concordant. Discordant, and Symmetric regions
+for f in *AlleleHMM_geneMP.bed
+do echo $f
+cat $f | awk 'BEGIN{OFS="\t"} ($7==$11) {print $4+$5}' > ${f}_Concordant_counts.txt
+cat $f | awk 'BEGIN{OFS="\t"} ($7!=$11) {print $4+$5}' > ${f}_Discordant_counts.txt
+fh=`echo $f|rev|cut -d _ -f 2-|rev`
+cat ${fh}_geneS.bed | awk 'BEGIN{OFS="\t"} {print $4+$5}' > ${f}_Symmetric_counts.txt
+done
+
+
+
+# SNPs (with at least 1 read mapped) covered by counts_plus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed and counts_minus_hmm_regions_t1e-0${T}_interestingHets_IGV.bed
+cd /workdir/sc2457/GM_GroSeq_AlleleDB_20170606/test_in_total/AlleleHMM_result
+T=5
+#GM
+##AlleleHMM but not in AlleleDB
+#j=gencode.v28lift37.annotation_geneMerged
+for s in plus minus
+do echo -e '#chr\tchromStart\tchromEnd\tBlockReadCount\tSNPreadCount\tStrand' > counts_${s}_noX_MinCount1_inAlleleHMM_t1e-0${T}_interestingHets.bed
+
+# counts.txt overlap with AlleleHMM blocks
+intersectBed -sorted -wb -a <(cat counts_${s}_noX_MinCount1_MaxPvalue1_IGV.bed| awk '{print "chr"$0}') -b counts_${s}_hmm_regions_t1e-0${T}_interestingHets_IGV.bed | awk '
+BEGIN{OFS="\t"} {print $1, $2, $3, $10, $4, $6}' >> counts_${s}_noX_MinCount1_inAlleleHMM_t1e-0${T}_interestingHets.bed
+
+# remove the SNPs overlap with AlleleDB (AlleleHMM and AlleleDB intersect)
+head counts_${s}_noX_MinCount1_inAlleleHMM_t1e-0${T}_interestingHets.bed -n 1 > counts_${s}_noX_MinCount1_inAlleleHMM_t1e-0${T}_interestingHets_outAlleleDB.bed
+intersectBed -sorted -s -v -a counts_${s}_noX_MinCount1_inAlleleHMM_t1e-0${T}_interestingHets.bed -b interestingHets_${s}_MinCount1_MaxPvalue1_inAlleleHMM.bed >> counts_${s}_noX_MinCount1_inAlleleHMM_t1e-0${T}_interestingHets_outAlleleDB.bed
+
+# overlap AlleleHMM (exclude AlleleDB), and allele-specific gene annotation
+intersectBed -sorted -s -wb -a counts_${s}_noX_MinCount1_inAlleleHMM_t1e-0${T}_interestingHets_outAlleleDB.bed -b ${j}_interestingHets.bed > counts_${s}_noX_MinCount1_inAlleleHMM_t1e-0${T}_interestingHets_outAlleleDB_geneMP.bed
+
+# overlap AlleleHMM (exclude AlleleDB), and all gene annotation
+intersectBed -sorted -s -u -a counts_${s}_noX_MinCount1_inAlleleHMM_t1e-0${T}_interestingHets_outAlleleDB.bed -b ${j}.bed > counts_${s}_noX_MinCount1_inAlleleHMM_t1e-0${T}_interestingHets_outAlleleDB_inGene.bed
+
+# overlap AlleleHMM (exclude AlleleDB), and symmetric gene annotation
+intersectBed -sorted -s -u -a <(intersectBed -sorted -s -v -a counts_${s}_noX_MinCount1_inAlleleHMM_t1e-0${T}_interestingHets_outAlleleDB.bed -b ${j}_interestingHets.bed) -b ${j}.bed > counts_${s}_noX_MinCount1_inAlleleHMM_t1e-0${T}_interestingHets_outAlleleDB_geneS.bed
+
+
+
+done
+
+
+for f in *_outAlleleDB_geneMP.bed
+do 
+echo $f
+#printf "# of SNPs:"
+#cat $f |wc -l
+
+printf "Concordant with Gene:"
+cat $f | awk 'BEGIN{OFS="\t"} (substr($4,1,1) == $10) {print $0}' |wc -l
+printf "Discordant with Gene:"
+cat $f | awk 'BEGIN{OFS="\t"} (substr($4,1,1) != $10) {print $0}' |wc -l
+
+fh=`echo $f|rev|cut -d _ -f 2-|rev`
+printf "In gene:"
+cat ${fh}_inGene.bed |wc -l
+done
+
+
+# the read counts at Concordant, Discordant, and Symmetric regions
+for f in *_outAlleleDB_geneMP.bed
+do echo $f
+cat $f | awk 'BEGIN{OFS="\t"} (substr($4,1,1) == $10) {print substr($5,3,1)+substr($5,5,1)}' > ${f}_Concordant_counts.txt
+cat $f | awk 'BEGIN{OFS="\t"} (substr($4,1,1) != $10) {print substr($5,3,1)+substr($5,5,1)}' > ${f}_Discordant_counts.txt
+fh=`echo $f|rev|cut -d _ -f 2-|rev`
+cat ${fh}_geneS.bed | awk 'BEGIN{OFS="\t"} {print substr($5,3,1)+substr($5,5,1)}' > ${f}_Symmetric_counts.txt
+done
+
+cat counts_*_noX_MinCount1_inAlleleHMM_t1e-05_interestingHets_outAlleleDB_geneMP.bed_Concordant_counts.txt > H_Concordant_counts.txt
+cat counts_*_noX_MinCount1_inAlleleHMM_t1e-05_interestingHets_outAlleleDB_geneMP.bed_Discordant_counts.txt > H_Discordant_counts.txt
+cat counts_*_noX_MinCount1_inAlleleHMM_t1e-05_interestingHets_outAlleleDB_geneMP.bed_Symmetric_counts.txt  > H_Symmetric_counts.txt
+cat interestingHets_*_MinCount1_MaxPvalue1_inAlleleHMM_geneMP.bed_Concordant_counts.txt > A_Concordant_counts.txt
+cat interestingHets_*_MinCount1_MaxPvalue1_inAlleleHMM_geneMP.bed_Discordant_counts.txt > A_Discordant_counts.txt
+cat interestingHets_*_MinCount1_MaxPvalue1_inAlleleHMM_geneMP.bed_Symmetric_counts.txt > A_Symmetric_counts.txt
+cat interestingHets_*_MinCount1_MaxPvalue1_NotInAlleleHMM_geneMP.bed_Concordant_counts.txt > D_Concordant_counts.txt
+cat interestingHets_*_MinCount1_MaxPvalue1_NotInAlleleHMM_geneMP.bed_Discordant_counts.txt > D_Discordant_counts.txt
+cat interestingHets_*_MinCount1_MaxPvalue1_NotInAlleleHMM_geneMP.bed_Symmetric_counts.txt > D_Symmetric_counts.txt
+
+
+# fisher_exact
+[[5274,  15926],[2505, 42037]] 
+import scipy.stats as stats
+oddsratio, pvalue = stats.fisher_exact([[5274,  15926],[2505, 42037]] )
+In [6]: pvalue
+Out[6]: 0.0
+In [7]: oddsratio
+Out[7]: 5.5572175503319619
+
+
+# how many MP switches in gene annotaiton of AlleleDB SNPs that overlape or not overlap with AlleleHMM?
+j=gencode.v28lift37.annotation_geneMerged
+cat ${j}.merged_cov_binomtest.bed | 
+awk 'BEGIN {OFS="\t"} NR==1 {print $1, $2, $3, "state", $9, "strand", $6, $7, $8}; 
+(NR>1 && $6>$7 && $9 <= thresh) {print $1, $2, $3, "M", $9, $4, $6, $7, $8}; 
+(NR>1 && $7>$6 && $9 <= thresh) {print $1, $2, $3, "P", $9, $4, $6, $7, $8};
+(NR>1 && $9 > thresh)           {print $1, $2, $3, "S", $9, $4, $6, $7, $8};
+' thresh=$(awk 'END {print $6}' ${j}.merged_cov_binomtest_FDR.txt)   < ${j}.merged_cov_binomtest.bed > ${j}.merged_cov_binomtest_IGV.bed
+
+
+bed_file=${j}.merged_cov_binomtest_IGV.bed 
+
+intersectBed -sorted -s -wb -a ${Input_counts_plus}_inAlleleHMM.bed -b ${bed_file} | awk 'BEGIN {OFS="\t"} {print $7,$8,$9,$10,$11}' |uniq | awk 'BEGIN {OFS="\t"} {print $2,$3,$4,$5}'|uniq -c > interestingHets_AlleleDB_in_AlleleHMM_MP_switch_counts.txt
+intersectBed -sorted -s -wb -a ${Input_counts_plus}_NotInAlleleHMM.bed -b ${bed_file}| awk 'BEGIN {OFS="\t"} {print $7,$8,$9,$10,$11}' |uniq | awk 'BEGIN {OFS="\t"} {print $2,$3,$4,$5}'|uniq -c > interestingHets_AlleleDB_out_AlleleHMM_MP_switch_counts.txt
+intersectBed -sorted -s -wb -a ${Input_counts_minus}_inAlleleHMM.bed -b ${bed_file} | awk 'BEGIN {OFS="\t"} {print $7,$8,$9,$10,$11}' |uniq | awk 'BEGIN {OFS="\t"} {print $2,$3,$4,$5}'|uniq -c >> interestingHets_AlleleDB_in_AlleleHMM_MP_switch_counts.txt
+intersectBed -sorted -s -wb -a ${Input_counts_minus}_NotInAlleleHMM.bed -b ${bed_file}| awk 'BEGIN {OFS="\t"} {print $7,$8,$9,$10,$11}' |uniq | awk 'BEGIN {OFS="\t"} {print $2,$3,$4,$5}'|uniq -c >> interestingHets_AlleleDB_out_AlleleHMM_MP_switch_counts.txt
+
+intersectBed -sorted -s -wb -a counts_plus_noX_MinCount1_inAlleleHMM_t1e-0${T}_interestingHets_outAlleleDB.bed -b ${bed_file}| awk 'BEGIN {OFS="\t"} {print substr($4,1,1),$7,$8,$9,$10}' |uniq | awk 'BEGIN {OFS="\t"} {print $2,$3,$4,$5}'|uniq -c > counts_noX_MinCount1_inAlleleHMM_t1e-0${T}_interestingHets_outAlleleDB_switch_counts.txt
+intersectBed -sorted -s -wb -a counts_minus_noX_MinCount1_inAlleleHMM_t1e-0${T}_interestingHets_outAlleleDB.bed -b ${bed_file}| awk 'BEGIN {OFS="\t"} {print substr($4,1,1),$7,$8,$9,$10}' |uniq | awk 'BEGIN {OFS="\t"} {print $2,$3,$4,$5}'|uniq -c >> counts_noX_MinCount1_inAlleleHMM_t1e-0${T}_interestingHets_outAlleleDB_switch_counts.txt
+
+
+### IGV files for maunuscript figure
+
+cat interestingHets_plus_MinCount1_MaxPvalue1.bed |awk 'BEGIN {OFS="\t"; t=","} {print $1,$2,$3, $7t$4t$5, "111", "+"}' > interestingHets_plus_MinCount1_MaxPvalue1_IGV.bed
+cat interestingHets_minus_MinCount1_MaxPvalue1.bed |awk 'BEGIN {OFS="\t"; t=","} {print $1,$2,$3, $7t$4t$5, "111", "-"}' > interestingHets_minus_MinCount1_MaxPvalue1_IGV.bed
