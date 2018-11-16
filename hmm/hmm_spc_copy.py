@@ -1,28 +1,137 @@
-#python hmm_spc.py counts_hmm.txt counts_plus_hmm.txt counts_minus_hmm.txt chromosome_num
+#python AlleleHMM.py prefix counts_plus_hmm.txt counts_minus_hmm.txt
 import numpy as np
 from math import *
 import scipy.stats
-from sys import argv
+#from sys import argv
 import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
 import time
 import multiprocessing
 
+import sys, getopt
 
-### input data for training
-# comnined all autosome
-# combined plus trand and minus strand
+counts_hmm="-"
+counts_plus_hmm = "-"
+counts_minus_hmm = "-"
+predict=False
+tao = "default"
+prefix="AlleleHMM_output"
+ITER=10 # number of iteration
 
-f_int = argv[1] #"counts_hmm.txt"
-counts_plus_hmm = argv[2] #"counts_plus_hmm.txt"
-counts_minus_hmm = argv[3] #"counts_minus_hmm.txt"
-chromosome_num=int(argv[4])
+def help_message():
+    print "python AlleleHMM.py [options]"
+    print ""
+    print "options:"
+    print ""
+    print "To get help:"
+    print "-h, --help             Show this brief help menu."
+    print ""
+    print "Required options:"
+    print "For non-strand-specific data such as ChIP-seq:"
+    print "-i, --input_hmm=PATH   Path to the non-strnad-specific, allele-specific read counts file (counts_hmm.txt)"
+    print ""
+    print "For strand-specific data such as PRO-seq:"
+    print "-p, --input_plus_hmm=PATH    Path to the plus-strand allele-specific read counts file (counts_plus_hmm.txt)"
+    print "-m, --input_minus_hmm=PATH   Path to the minus-strand allele-specific read counts file (counts_minus_hmm.txt)"
+    print ""
+    
+    print "Optional operations:"
+    print "-o, --output_prefix=STR      prefix for the output file. default=AlleleHMM_output"
+    print "-t, --tao=FLOAT   AlleleHMM identify allele-specific blocks using 9 values of t (1E-01, 1E-02, ...,1E-09) by default."
+    print "                  User can assign a specific tao for the calculation."
+    print ""
+    print "examples:"
+    print "For strand-specific data such as PRO-seq use:"
+    print "python AlleleHMM.py -p counts_plus_hmm.txt -m counts_minus_hmm.txt"
+    
+    print "For non-strand-specific data such as ChIP-seq use: "
+    print "python AlleleHMM.py -i counts_hmm.txt"
+
+#h_message='For strand-specific data such as PRO-seq use: \npython AlleleHMM.py -p counts_plus_hmm.txt -m counts_minus_hmm.txt \n\nFor non-strand-specific data such as ChIP-seq use: \npython AlleleHMM.py -i counts_hmm.txt'
+#h_message='python AlleleHMM.py -h'
+
+try:
+   opts, args = getopt.getopt(sys.argv[1:],"ht:p:m:i:o:",["input_hmm=","input_plus_hmm=","input_minus_hmm=", "predict=", "tao=", "output_prefix="])
+   if len(opts)== 0:
+      help_message()
+      sys.exit(2)
+except getopt.GetoptError:
+   help_message()
+   sys.exit(2)
+
+#print opts
+i,p,m=0,0,0
+for opt, arg in opts:
+    if opt in ("-h"):
+      help_message()
+      sys.exit()
+    elif opt in ("-p","--input_plus_hmm"):
+      counts_plus_hmm = arg
+      p+=1
+    elif opt in ("-m","--input_minus_hmm"):
+      counts_minus_hmm = arg
+      assert counts_minus_hmm.count("plus") <1, 'please double check file name is correct'
+      m+=1
+    elif opt in ("-i","--input_hmm"):
+      counts_hmm = arg
+      i+=1
+    elif opt in ("--predict="):
+      predict = arg
+    elif opt in ("-t", "--tao="):
+      tao = float(arg)
+    elif opt in ("-o", "--output_prefix="):
+      prefix = arg
+
+print 'Input non-strand-specific file :\t', counts_hmm
+print 'Input plus file :\t', counts_plus_hmm
+print 'Input minus file:\t', counts_minus_hmm
+print 'tao:\t', tao
+
+if (i+p+m) <1 or (i+p > 1) or (i+p+m >2) or (p != m):
+   print '\nInput file error, please check the number of input files!\n'
+   help_message()
+   sys.exit()
+
+if p==0 and i==1: # only one input, prefix is the part that remove ".txt"
+      counts_plus_hmm = counts_hmm
+
+#if prefix == "":
+#   if p==0 and i==1: # only one input, prefix is the part that remove ".txt"
+#      counts_plus_hmm = counts_hmm
+#      prefix='.'.join(counts_plus_hmm.split(".")[0:-1])
+#   else:
+#      temp=counts_plus_hmm.split("plus") 
+#      temp[-1] = temp[-1].split(".")[0]
+#      for i in xrange(len(temp)):
+#         temp[i]=temp[i].strip("_")
+#      prefix='_'.join(temp)
+#      prefix = prefix.strip("_")
+
+
+print 'output prefix:\t', prefix
+
+input_i, input_p, input_m= i,p,m
 
 #data
-mat  = np.loadtxt(f_int, dtype=int ,delimiter='\t', usecols=[2], skiprows=1)
-total = np.loadtxt(f_int, dtype=int ,delimiter='\t', usecols=[4], skiprows=1)
-state = np.loadtxt(f_int, dtype=str ,delimiter='\t', usecols=[5], skiprows=1)
+### input data for training
+# comnined chromosomes
+# combine plus strand and minus strand info for user
+if counts_minus_hmm == "-":
+    mat  = np.loadtxt(counts_plus_hmm, dtype=int ,delimiter='\t', usecols=[2], skiprows=1)
+    total = np.loadtxt(counts_plus_hmm, dtype=int ,delimiter='\t', usecols=[4], skiprows=1)
+    state = np.loadtxt(counts_plus_hmm, dtype=str ,delimiter='\t', usecols=[5], skiprows=1)
+else:
+    mat_1  = np.loadtxt(counts_plus_hmm, dtype=int ,delimiter='\t', usecols=[2], skiprows=1)
+    total_1 = np.loadtxt(counts_plus_hmm, dtype=int ,delimiter='\t', usecols=[4], skiprows=1)
+    state_1 = np.loadtxt(counts_plus_hmm, dtype=str ,delimiter='\t', usecols=[5], skiprows=1)
+    mat_2  = np.loadtxt(counts_minus_hmm, dtype=int ,delimiter='\t', usecols=[2], skiprows=1)
+    total_2 = np.loadtxt(counts_minus_hmm, dtype=int ,delimiter='\t', usecols=[4], skiprows=1)
+    state_2 = np.loadtxt(counts_minus_hmm, dtype=str ,delimiter='\t', usecols=[5], skiprows=1)
+    mat=np.concatenate((mat_1, mat_2))
+    total=np.concatenate((total_1, total_2))
+    state=np.concatenate((state_1, state_2))
+
 n_state = np.full(len(state), int(3), dtype=int)
 n_state[state=="M"] = 0
 n_state[state=="S"] = 1
@@ -37,17 +146,14 @@ I_p=0.25
 
 ##transition
 # 0,1,2 = M, S, P
-t = 1e-05
-t_mm, t_ms, t_mp = 1-t, t/2, t/2
-t_sm, t_ss, t_sp = t/2, 1-t, t/2
-t_pm, t_ps, t_pp = t/2, t/2, 1-t
-
-
-T = np.log(np.array( [[t_mm, t_ms, t_mp],[t_sm, t_ss, t_sp],[t_pm, t_ps, t_pp]]))
+#t = 1e-05
+#t_mm, t_ms, t_mp = 1-t, t/2, t/2
+#t_sm, t_ss, t_sp = t/2, 1-t, t/2
+#t_pm, t_ps, t_pp = t/2, t/2, 1-t
+#T = np.log(np.array( [[t_mm, t_ms, t_mp],[t_sm, t_ss, t_sp],[t_pm, t_ps, t_pp]]))
 
 ## emmision
 p_m, p_s,p_p = 0.7, 0.5, 0.3
-##p_m, p_s,p_p = 0.8, 0.5, 0.2
 p = [p_m, p_s,p_p]
 
 
@@ -103,11 +209,6 @@ def viterbi (p, T, x=mat, n=total):
         i -= 1
     
     viterbi_path_forward = np.array(viterbi_path_backward[::-1])
-    #plt.plot(np.arange(0,500), n_state[0:500], color='b')
-    #plt.plot(np.arange(0,500), viterbi_path_forward[0:500], color='red')
-    #plt.savefig('viterbi_path_forward.pdf')
-    #plt.close()
-    #plt.show()
     return viterbi_path_forward
 
 
@@ -125,7 +226,7 @@ def sumLogProb(a, b):
 
 
 
-def forward_probability_calculation(x=mat, n=total, p=p, T=T):
+def forward_probability_calculation(x, n, p, T):
     f_p_m = np.full((3, len(x)), float('-inf'))
     # Initialization:
     f_p_m[0, 0] = log(I_m) + get_emission_log_prob(x[0],n[0],p[0])
@@ -142,10 +243,10 @@ def forward_probability_calculation(x=mat, n=total, p=p, T=T):
 
 
 
-def backward_probability_calculation(x=mat, n=total, p=p, T=T):
+def backward_probability_calculation(x, n, p, T):
     b_p_m = np.full((3, len(x)), float('-inf'))
     # Initialization:
-    b_p_m[0, len(x)-1] = log(1)  #???
+    b_p_m[0, len(x)-1] = log(1) 
     b_p_m[1, len(x)-1] = log(1)
     b_p_m[2, len(x)-1] = log(1)
     #Iteration
@@ -161,18 +262,17 @@ def backward_probability_calculation(x=mat, n=total, p=p, T=T):
 
 
 def em_interate(T, p, x=mat, n=total):
-    t = time.time()
+    #t = time.time()
     f_p_m, p_Y_f = forward_probability_calculation(x, n, p, T)
-    print "forward: ", t- time.time()
+    #print "forward: ", t- time.time()
     b_p_m, p_Y_b = backward_probability_calculation(x, n, p, T)
-    print "backward: ", t- time.time()
+    #print "backward: ", t- time.time()
     
     #local P(Y)
     p_Y_l = np.full((1, len(x)), float('-inf'))
     for i in xrange(len(x)):
         p_Y_l[0,i] = sumLogProb(sumLogProb(b_p_m[0,i]+f_p_m[0,i], b_p_m[1,i]+f_p_m[1, i]),b_p_m[2, i]+f_p_m[2, i])
-    print "p_Y_l ", t- time.time()
-    #A = [[None, None, None], [None, None, None], [None, None, None]]
+    #print "p_Y_l ", t- time.time()
     A = np.zeros((3,3))
     new_P = [None, None, None] #P_m, P_s, P_p 
     
@@ -181,8 +281,7 @@ def em_interate(T, p, x=mat, n=total):
         for k in range(3):
             for l in range(3):
                 A[k,l] = A[k,l] + exp(f_p_m[k, i] + T[k,l] + get_emission_log_prob(x[i+1],n[i+1],p[l]) + b_p_m[l, i+1] - p_Y_l[0,i])
-    #A = np.array(A)
-    print "A : ", t- time.time()
+    #print "A : ", t- time.time()
     new_T = np.zeros((3,3))
     for k in range(3):
         new_P[k] = np.sum(np.exp(f_p_m[k,] + b_p_m[k,]-p_Y_l) * x ) / np.sum(np.exp(f_p_m[k,] + b_p_m[k,]-p_Y_l) * n ) 
@@ -192,25 +291,23 @@ def em_interate(T, p, x=mat, n=total):
     p2=new_P[2]
     new_P[0]= (p0+1-p2)/2.0
     new_P[2]= (p2+1-p0)/2.0
-    #new_p_Y_f = forward_probability_calculation(p= new_P, T=np.log(new_T))[1]
-    print "secs: ", t- time.time()
+    #print "secs: ", t- time.time()
     print new_T, new_P, p_Y_f
     return np.log(new_T), new_P, p_Y_f
 
 
 def em_interate_T_mp_fixed(T, p, x=mat, n=total, update_state=1):
-    t = time.time()
+    #t = time.time()
     f_p_m, p_Y_f = forward_probability_calculation(x, n, p, T)
-    print "forward: ", t- time.time()
+    #print "forward: ", t- time.time()
     b_p_m, p_Y_b = backward_probability_calculation(x, n, p, T)
-    print "backward: ", t- time.time()
+    #print "backward: ", t- time.time()
     
     #local P(Y)
     p_Y_l = np.full((1, len(x)), float('-inf'))
     for i in xrange(len(x)):
         p_Y_l[0,i] = sumLogProb(sumLogProb(b_p_m[0,i]+f_p_m[0,i], b_p_m[1,i]+f_p_m[1, i]),b_p_m[2, i]+f_p_m[2, i])
-    print "p_Y_l ", t- time.time()
-    #A = [[None, None, None], [None, None, None], [None, None, None]]
+    #print "p_Y_l ", t- time.time()
     A = np.zeros((3,3))
     new_P = [None, None, None] #P_m, P_s, P_p 
     
@@ -219,8 +316,7 @@ def em_interate_T_mp_fixed(T, p, x=mat, n=total, update_state=1):
         for l in range(3):
             k=update_state
             A[k,l] = A[k,l] + exp(f_p_m[k, i] + T[k,l] + get_emission_log_prob(x[i+1],n[i+1],p[l]) + b_p_m[l, i+1] - p_Y_l[0,i])
-    #A = np.array(A)
-    print "A : ", t- time.time()
+    #print "A : ", t- time.time()
     for k in range(3):
         new_P[k] = np.sum(np.exp(f_p_m[k,] + b_p_m[k,]-p_Y_l) * x ) / np.sum(np.exp(f_p_m[k,] + b_p_m[k,]-p_Y_l) * n ) 
     # adjust so that p_m + p_p = 1
@@ -232,9 +328,8 @@ def em_interate_T_mp_fixed(T, p, x=mat, n=total, update_state=1):
     new_T = np.exp(T)
     k = update_state
     new_T[k] = A[k]/A[k].sum()
-    #new_p_Y_f = forward_probability_calculation(p= new_P, T=np.log(new_T))[1]
-    print "secs: ", t- time.time()
-    print new_T, new_P, p_Y_f
+    #print "secs: ", t- time.time()
+    #print new_T, new_P, p_Y_f
     return np.log(new_T), new_P, p_Y_f
 
 
@@ -248,14 +343,6 @@ def make_em_plot(em_p_Y_f_list, t, file_name='em_p_Y_f_list_plot.pdf', i=0):
     plt.close()
 
 
-def hist(x, b=50, output_name = 'hist.pdf'):
-    hist, bins = np.histogram(x, bins=b)
-    width = 0.7 * (bins[1] - bins[0])
-    center = (bins[:-1] + bins[1:]) / 2
-    plt.bar(center, hist, align='center', width=width)
-    plt.savefig(output_name)
-    plt.close()
-
 ### input data for viterbi
 # seperate the autosome
 # seperate plus and minus strand
@@ -266,7 +353,7 @@ def hmm_prediction(f_v, strand, t,new_T, new_P):
         data_v, chrom_v, snppos_v, mat_v, total_v, state_v, n_state_v = f_data_dic[f_v]
     else:
         data_v = np.loadtxt(f_v, dtype=str ,delimiter='\t', usecols=range(0,6), skiprows=1)
-        chrom_v = np.loadtxt(f_v, dtype=int ,delimiter='\t', usecols=[0], skiprows=1)
+        chrom_v = np.loadtxt(f_v, dtype=str ,delimiter='\t', usecols=[0], skiprows=1)
         snppos_v = np.loadtxt(f_v, dtype=int ,delimiter='\t', usecols=[1], skiprows=1)
         mat_v  = np.loadtxt(f_v, dtype=int ,delimiter='\t', usecols=[2], skiprows=1)
         total_v = np.loadtxt(f_v, dtype=int ,delimiter='\t', usecols=[4], skiprows=1)
@@ -278,19 +365,18 @@ def hmm_prediction(f_v, strand, t,new_T, new_P):
         f_data_dic[f_v]=[data_v, chrom_v, snppos_v, mat_v, total_v, state_v, n_state_v]
     
     v_path=[]
-    #v_path_Tfixed=[]
+    chrom_list= list(set(chrom_v))
+    chrom_list.sort()
     
-    for i in xrange(1,chromosome_num+1):
+    for i in chrom_list:
         t_c = total_v[chrom_v == i]
         x_c = mat_v[chrom_v == i]
-        #snp_c = snppos[chrom == i]
         v_path += (list(viterbi (x=x_c, n=t_c, p=new_P, T=new_T)))
-        #v_path_Tfixed += (list(viterbi (x=x_c, n=t_c, p=new_P, T=T)))
     
     # output regions with neighbor sharing the same states as a bed file
     state_map = {0:'M', 1:'S', 2:'P'}
     region_list=[]
-    for c in xrange(1,chromosome_num+1):
+    for c in chrom_list:
         snppos_c = snppos_v[chrom_v == c]
         v_path_c = np.array(v_path)[chrom_v == c]
         u = snppos_c[0]
@@ -301,15 +387,21 @@ def hmm_prediction(f_v, strand, t,new_T, new_P):
                 u = snppos_c[l]
         region_list.append([str(c), str(u-1), str(snppos_c[-1]), state_map[v_path_c[-1]]])
     
-    with open(f_v[0:-4]+'_regions_t'+str(t)+'.bed', 'w') as out:
+    #with open(f_v[0:-4]+'_regions_t'+str('%.0E' %t)+'.bed', 'w') as out:
+    name="both"
+    if strand== "+":
+        name="plus"
+    elif strand== "-":
+        name="minus"
+        
+    with open(prefix+"_"+name+'_regions_t'+str('%.0E' %t)+'.bed', 'w') as out:
         for r in region_list:
             out.write('\t'.join(r+['111',strand]))
             out.write('\n')
 
-### run em
-### run em with Tmp fixed, Ts update
 
-def run_em_T_mp_fixed(t):
+### run em with Tmp fixed, Ts update
+def run_em_T_mp_fixed(t, max_iter = ITER):
     t_mm, t_ms, t_mp = 1-t, t/2, t/2
     t_sm, t_ss, t_sp = t/2, 1-t, t/2
     t_pm, t_ps, t_pp = t/2, t/2, 1-t
@@ -318,22 +410,21 @@ def run_em_T_mp_fixed(t):
     p_Y_f_list = [p_Y_f]
     new_T_list = [new_T]
     new_P_list = [new_P]
-    max_iter = 30
+    max_iter = max_iter
     for i in xrange(max_iter):
-        print i
+        print "iteration",i
         new_T, new_P, p_Y_f = em_interate_T_mp_fixed(new_T, new_P, x=mat, n=total)
         p_Y_f_list.append(p_Y_f)
         new_T_list.append(new_T)
         new_P_list.append(new_P)
-    make_em_plot(p_Y_f_list,"count_min=1 Tmx, Tpx fixed, t="+str(t)+", Tsx allow change for EM", f_int[0:-4]+"_em_p_Y_f_list_plot_count_min=1_Tmpfixed_t="+str(t)+".pdf")
-    make_em_plot(p_Y_f_list, "count_min=1 Tmx, Tpx fixed, t="+str(t)+", Tsx allow change for EM", f_int[0:-4]+"_em_p_Y_f_list_plot_count_min=1_Tmpfixed_t="+str(t)+"_15.pdf" ,15)
-    with open(f_int[0:-4]+"_t="+str(t)+'_parameters.txt', 'w') as out:
+    #make_em_plot(p_Y_f_list,"count_min=1 Tmx, Tpx fixed, t="+str('%.0E' %t)+", Tsx allow change for EM", prefix+"_em_p_Y_f_list_plot_count_min=1_Tmpfixed_t="+str('%.0E' %t)+".pdf")
+    with open(prefix+"_t="+str('%.0E' %t)+'_parameters.txt', 'w') as out:
         out.write("T="+str(new_T_list[-1])+"\n")
         out.write("P="+str(new_P_list[-1])+"\n")
     return [t, new_T_list,new_P_list, p_Y_f_list]
 
 
-def run():
+def run_all():
     t_list=[]
     for i in range(1,10):
         t_list.append(10**(-i))
@@ -344,62 +435,59 @@ def run():
         pool.close() # no more tasks
         pool.join()
         
-        ##for p in pool_output:
-        #for i in range(1,10):
-        #    t, new_T_list,new_P_list, _ = pool_output[i-1]
-        #    new_T = new_T_list[-1]
-        #    new_P = new_P_list[-1]
-        #    #print t
-        #    #print np.exp(new_T)
-        #    #print new_P
-        #    if counts_minus_hmm == "-":
-        #        hmm_prediction(counts_plus_hmm, " ", '1e-0'+str(i),new_T, new_P)
-        #    else:
-        #        hmm_prediction(counts_plus_hmm, "+", '1e-0'+str(i),new_T, new_P)
-        #        hmm_prediction(counts_minus_hmm, "-",'1e-0'+str(i),new_T, new_P)
     except: # in case pool doesn't work
         result=[]
         for i in range(1,10):
             result.append(run_em_T_mp_fixed(10**(-i)))
-        #for i in range(1,10):
-        #    t, new_T_list,new_P_list, _ = result[i-1]
-        #    new_T = new_T_list[-1]
-        #    new_P = new_P_list[-1]
-        #    if counts_minus_hmm == "-":
-        #        hmm_prediction(counts_plus_hmm, " ", '1e-0'+str(i),new_T, new_P)
-        #    else:
-        #        hmm_prediction(counts_plus_hmm, "+", '1e-0'+str(i),new_T, new_P)
-        #        hmm_prediction(counts_minus_hmm, "-",'1e-0'+str(i),new_T, new_P)
 
 
+def prediction(t):
+    print prefix+"_t="+str('%.0E' %t)+'_parameters.txt'
+    with open(prefix+"_t="+str('%.0E' %t)+'_parameters.txt') as p_in:
+        l=p_in.readlines()
+    #print i
+    T=[]
+    for ll in l[0:3]:
+        for lll in ll.strip().strip('T=').strip('[').strip(']').split():
+            #print lll
+            T.append(float(lll))
+        #print T
+    new_T=np.array(T).reshape(3,3)
+    new_P=[float(ll) for ll in l[-1].strip().strip('P=').strip('[').strip(']').split(",")]
+    print "T", new_T
+    print "P", new_P
+    if input_i+input_m+input_p==1 : #counts_minus_hmm == "-":
+        hmm_prediction(counts_plus_hmm, ".", t,new_T, new_P)
+    else:
+        hmm_prediction(counts_plus_hmm, "+", t,new_T, new_P)
+        hmm_prediction(counts_minus_hmm, "-", t,new_T, new_P)
 
-def prediction():
+def prediction_all():
     for i in range(1,10):
-        #print str(10**(-i))
-        with open(f_int[0:-4]+"_t="+str(10**(-i))+'_parameters.txt') as p_in:
-            l=p_in.readlines()
-        print i
-        T=[]
-        for ll in l[0:3]:
-            for lll in ll.strip().strip('T=').strip('[').strip(']').split():
-                print lll
-                T.append(float(lll))
-            print T
-        new_T=np.array(T).reshape(3,3)
-        new_P=[float(ll) for ll in l[-1].strip().strip('P=').strip('[').strip(']').split(",")]
-        if counts_minus_hmm == "-":
-            hmm_prediction(counts_plus_hmm, " ", '1e-0'+str(i),new_T, new_P)
-        else:
-            hmm_prediction(counts_plus_hmm, "+", '1e-0'+str(i),new_T, new_P)
-            hmm_prediction(counts_minus_hmm, "-",'1e-0'+str(i),new_T, new_P)
+        prediction(10**(-i))
 
 
 
 if __name__ == '__main__':
-    try:
-        if argv[5]=="predict":
-            prediction()
-    except:
-        run()
-        prediction()
-    
+    t = time.time()
+    if tao != "default": # specific tao
+        try:
+            if predict !=False:
+                prediction(tao)
+            else:
+                run_em_T_mp_fixed(tao)
+                prediction(tao)
+        except:
+            run_em_T_mp_fixed(tao)
+            prediction(tao)
+    else: # all tao
+        try:
+            if predict !=False:
+                prediction_all()
+            else:
+                run_all()
+                prediction_all()
+        except:
+            run_all()
+            prediction_all()
+    print "AlleleHMM Run finished:", time.time() -t , "secs"
