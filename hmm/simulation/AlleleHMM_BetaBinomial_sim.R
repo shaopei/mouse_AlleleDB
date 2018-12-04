@@ -28,7 +28,7 @@ sim_HMM_block_betaBino <- function(BlockLength, ExpressionLevel, MatBinoP, OD){
 # expression level of each block
 #e <- c(10,10,10)
 #mat_p <- c(0.5,0.9,0.5)
-#od <- c(0.01, 0, 0.01)
+#od <- c(0.25, 0.25, 0.25)
 
 Sensitivity_betaBino<- function(l, e, mat_p, od, t){
   # Simulation of 3 HMM blocks (Sym-Mat-Sym)
@@ -54,8 +54,8 @@ Sensitivity_betaBino<- function(l, e, mat_p, od, t){
   }
 
  blockList$AlleleDB_state <- "S"
- blockList$AlleleDB_state[blockList$AlleleDB_p_value <0.05 & blockList$SimState!="S" & blockList$mat_reads/blockList$total_reads >= 0.5] <- "M"
- blockList$AlleleDB_state[blockList$AlleleDB_p_value <0.05 & blockList$SimState!="S" & blockList$mat_reads/blockList$total_reads < 0.5] <- "P" 
+ blockList$AlleleDB_state[blockList$AlleleDB_p_value <0.05 & blockList$mat_reads/blockList$total_reads >= 0.5] <- "M"
+ blockList$AlleleDB_state[blockList$AlleleDB_p_value <0.05 & blockList$mat_reads/blockList$total_reads < 0.5] <- "P" 
  
  
   ## HMM prediction
@@ -100,25 +100,19 @@ Sensitivity_betaBino<- function(l, e, mat_p, od, t){
  blockList$HMM_accum_total_reads <- hmm_result$accum_total_reads
  blockList$HMM_accum_mat_reads<- hmm_result$accum_mat_reads
  blockList$HMM_state<- hmm_result$hmm_state
- ##test Sensitivity
- if (mat_p[2] >0.5){
-   if (sum(blockList$SimState!="S") !=0) {
-     SNP_Sensitivity = sum(blockList$AlleleDB_state=="M" & blockList$SimState=="M") /sum(blockList$SimState =="M") 
-     AlleleHMM_Sensitivity = sum(blockList$HMM_p_value <0.05 & blockList$HMM_state=="M" & blockList$SimState=="M") /sum(blockList$SimState=="M") 
+
+ # sensitivity
+ if (sum(blockList$SimState!="S") !=0) {
+     SNP_Sensitivity = sum(blockList$AlleleDB_p_value < 0.05 & blockList$SimState!="S") /sum(blockList$SimState !="S") 
+     AlleleHMM_Sensitivity = sum(blockList$HMM_p_value <0.05 & blockList$SimState!="S") /sum(blockList$SimState !="S") 
    }  else{
-     SNP_Sensitivity = sum(blockList$AlleleDB_state=="M" & blockList$SimState=="M") /(sum(blockList$SimState=="M")+1) 
-     AlleleHMM_Sensitivity = sum(blockList$HMM_p_value <0.05 & blockList$HMM_state=="M" & blockList$SimState=="M") /(sum(blockList$SimState=="M")+1) 
+      SNP_Sensitivity = sum(blockList$AlleleDB_p_value < 0.05 & blockList$SimState!="S") /(sum(blockList$SimState !="S")+1)  
+     AlleleHMM_Sensitivity = sum(blockList$HMM_p_value <0.05 & blockList$SimState!="S") /(sum(blockList$SimState !="S")+1)
    }
- }
- else{
-   if (sum(blockList$SimState!="S") !=0) {
-     SNP_Sensitivity = sum(blockList$AlleleDB_state=="P" & blockList$SimState=="P") /sum(blockList$SimState =="P") 
-     AlleleHMM_Sensitivity = sum(blockList$HMM_p_value <0.05 & blockList$HMM_state=="P" & blockList$SimState=="P") /sum(blockList$SimState=="P") 
-   }  else{
-     SNP_Sensitivity = sum(blockList$AlleleDB_state=="P" & blockList$SimState=="P") /(sum(blockList$SimState=="P")+1) 
-     AlleleHMM_Sensitivity = sum(blockList$HMM_p_value <0.05 & blockList$HMM_state=="P" & blockList$SimState=="P") /(sum(blockList$SimState=="P")+1) 
-   }
- }
+ 
+ 
+ 
+ 
  # specificity
     SNP_Specificity = sum(blockList$AlleleDB_p_value >=0.05 & blockList$SimState=="S") /sum(blockList$SimState=="S") 
    AlleleHMM_Specificity = sum(blockList$HMM_state=="S" & blockList$SimState=="S") /sum(blockList$SimState=="S") 
