@@ -139,7 +139,7 @@ Sensitivity_betaBino<- function(l, e, mat_p, od, t){
                ))
 }
 
-Sensitivity_iter<- function(iteration,l, e, mat_p){
+Sensitivity_betaBino_iter<- function(iteration,l, e, mat_p, od, t=1e-5){
   SNP_sen_list=c()
   HMM_sen_list=c()
   SNP_spec_list=c()
@@ -148,7 +148,7 @@ Sensitivity_iter<- function(iteration,l, e, mat_p){
   HMM_prec_list=c()
   for (i in 1:iteration) {
     #print (i)
-    s=Sensitivity(l, e, mat_p)
+    s=Sensitivity_betaBino(l, e, mat_p, od, t)
     SNP_sen_list=c(SNP_sen_list, s$SNP_Sensitivity)
     HMM_sen_list=c(HMM_sen_list, s$AlleleHMM_Sensitivity)
     SNP_spec_list=c(SNP_spec_list, s$SNP_Specificity)
