@@ -408,13 +408,27 @@ Sensitivity<- function(l, e, mat_p){
  blockList$HMM_accum_total_reads <- hmm_result$accum_total_reads
  blockList$HMM_accum_mat_reads<- hmm_result$accum_mat_reads
  blockList$HMM_state<- hmm_result$hmm_state
+ 
+ ### calculate TP, FP, TN, N  # includes all SNPs at three blocks
+ P=sum(blockList$SimState!="S") 
+ SNP_TP = sum(blockList$AlleleDB_p_value <0.05 & blockList$SimState!="S")
+ HMM_TP = sum(blockList$HMM_p_value <0.05 & blockList$HMM_state != "S" & blockList$SimState!="S")
+ 
+ SNP_FP = sum(blockList$AlleleDB_p_value <0.05 & blockList$SimState =="S")   #incldue padding blocks
+ HMM_FP = sum(blockList$HMM_p_value <0.05 & blockList$HMM_state !="S" & blockList$SimState=="S") #incldue padding blocks
+ 
+ N=sum(blockList$SimState=="S")   #incldue padding blocks
+ 
+SNP_TN=sum(blockList$AlleleDB_p_value >=0.05 & blockList$SimState=="S")   #incldue padding blocks
+HMM_TN=sum(blockList$HMM_state=="S" & blockList$SimState=="S")   #incldue padding blocks
+
  ##test Sensitivity
- if (sum(blockList$SimState!="S") !=0) {
-   SNP_Sensitivity = sum(blockList$AlleleDB_p_value <0.05 & blockList$SimState!="S") /sum(blockList$SimState!="S") 
-   AlleleHMM_Sensitivity = sum(blockList$HMM_p_value <0.05 & blockList$SimState!="S") /sum(blockList$SimState!="S") 
+ if (P !=0) {
+   SNP_Sensitivity = SNP_TP/P
+   AlleleHMM_Sensitivity =HMM_TP /P
  }  else{
-    SNP_Sensitivity = sum(blockList$AlleleDB_p_value <0.05 & blockList$SimState!="S") /(sum(blockList$SimState!="S")+1) 
-   AlleleHMM_Sensitivity = sum(blockList$HMM_p_value <0.05 & blockList$SimState!="S") /(sum(blockList$SimState!="S")+1) 
+    SNP_Sensitivity = 0
+   AlleleHMM_Sensitivity = 0
  }
  
  # precision = TP/TP+FP
@@ -430,19 +444,19 @@ Sensitivity<- function(l, e, mat_p){
   }
  
  
- 
- 
  # specificity
-    SNP_Specificity = sum(blockList$AlleleDB_p_value >=0.05 & blockList$SimState=="S") /sum(blockList$SimState=="S") 
-   AlleleHMM_Specificity = sum(blockList$HMM_state=="S" & blockList$SimState=="S") /sum(blockList$SimState=="S") 
+    SNP_Specificity = SNP_TN /N
+   AlleleHMM_Specificity = HMM_TN /N
  #print(AlleleHMM_Specificity)
    
   return (list(SNP_Sensitivity=SNP_Sensitivity, 
                AlleleHMM_Sensitivity=AlleleHMM_Sensitivity,
                SNP_Specificity = SNP_Specificity,
                AlleleHMM_Specificity = AlleleHMM_Specificity,
-               SNP_precision = SNP_precision,
-               AlleleHMM_precision = AlleleHMM_precision 
+               P_Counts=c(P,SNP_TP, HMM_TP, SNP_FP, HMM_FP),
+               N_Counts=c(N, SNP_TN, HMM_TN)
+               #SNP_precision = SNP_precision,
+               #AlleleHMM_precision = AlleleHMM_precision 
                #, data=blockList 
                ))
 }
@@ -452,8 +466,8 @@ Sensitivity_iter<- function(iteration,l, e, mat_p){
   HMM_sen_list=c()
   SNP_spec_list=c()
   HMM_spec_list=c()
-  SNP_prec_list=c()
-  HMM_prec_list=c()
+  #SNP_prec_list=c()
+  #HMM_prec_list=c()
   for (i in 1:iteration) {
     #print (i)
     s=Sensitivity(l, e, mat_p)
@@ -461,8 +475,82 @@ Sensitivity_iter<- function(iteration,l, e, mat_p){
     HMM_sen_list=c(HMM_sen_list, s$AlleleHMM_Sensitivity)
     SNP_spec_list=c(SNP_spec_list, s$SNP_Specificity)
     HMM_spec_list=c(HMM_spec_list, s$AlleleHMM_Specificity)
-    SNP_prec_list=c(SNP_prec_list, s$SNP_precision)
-    HMM_prec_list=c(HMM_prec_list, s$AlleleHMM_precision)
+   # SNP_prec_list=c(SNP_prec_list, s$SNP_precision)
+  #  HMM_prec_list=c(HMM_prec_list, s$AlleleHMM_precision)
+  }
+  return (c(mean(SNP_sen_list),
+            mean(HMM_sen_list),
+            sd(SNP_sen_list)/sqrt(length(SNP_sen_list)),
+            sd(HMM_sen_list)/sqrt(length(HMM_sen_list)),
+            mean(SNP_spec_list),
+            mean(HMM_spec_list),
+            sd(SNP_spec_list)/sqrt(length(SNP_spec_list)),
+            sd(HMM_spec_list)/sqrt(length(HMM_spec_list))#,
+            #mean(SNP_prec_list),
+            #mean(HMM_prec_list),
+            #sd(SNP_prec_list)/sqrt(length(SNP_prec_list)),
+            #sd(HMM_prec_list)/sqrt(length(HMM_prec_list))
+            ))
+  #return (c(mean(SNP_sen_list), mean(HMM_sen_list)))
+}
+
+
+Precision_recall_specificity_iter<- function(iteration,l, e, mat_p){
+  SNP_sen_list=c()
+  HMM_sen_list=c()
+  SNP_spec_list=c()
+  HMM_spec_list=c()
+  SNP_prec_list=c()
+  HMM_prec_list=c()
+  
+  for (i in 1:iteration) {
+    #print (i)
+    m = Sensitivity(l, e, mat_p)  #SMS blocks
+    s = Sensitivity(l, e,  c(0.5,0.5,0.5))  #SSS blocks
+    P = m$P_Counts[1] #+s$P_Counts[1]        
+    SNP_TP = m$P_Counts[2] #+s$P_Counts[2]
+    HMM_TP = m$P_Counts[3] #+s$P_Counts[3]    
+    
+    SNP_FP = s$P_Counts[4] +m$P_Counts[4]   #SMS and SSS
+    HMM_FP = s$P_Counts[5] +m$P_Counts[5]  #SMS and SSS
+    N = s$N_Counts[1] + m$N_Counts[1]
+    SNP_TN = s$N_Counts[2] + m$N_Counts[2]
+    HMM_TN = s$N_Counts[3] + m$N_Counts[3]
+
+ ## Sensitivity TP/P
+ if (P !=0) {
+   SNP_Sensitivity = SNP_TP/P
+   AlleleHMM_Sensitivity =HMM_TP /P
+ }  else{
+    SNP_Sensitivity = 0
+   AlleleHMM_Sensitivity = 0
+ }
+ 
+ # precision = TP/TP+FP
+    if (SNP_TP == 0){
+      SNP_precision = 0
+    } else{
+      SNP_precision = SNP_TP /(SNP_TP+SNP_FP)
+    }
+    if (HMM_TP == 0){
+      AlleleHMM_precision = 0
+    } else{
+      AlleleHMM_precision = HMM_TP /(HMM_TP+HMM_FP)
+    }
+    
+ # specificity
+    SNP_Specificity = SNP_TN /N
+   AlleleHMM_Specificity = HMM_TN /N
+ #print(AlleleHMM_Specificity)
+
+
+    
+    SNP_sen_list=c(SNP_sen_list, SNP_Sensitivity)
+    HMM_sen_list=c(HMM_sen_list, AlleleHMM_Sensitivity)
+    SNP_spec_list=c(SNP_spec_list, SNP_Specificity)
+    HMM_spec_list=c(HMM_spec_list, AlleleHMM_Specificity)
+    SNP_prec_list=c(SNP_prec_list, SNP_precision)
+    HMM_prec_list=c(HMM_prec_list, AlleleHMM_precision)
   }
   return (c(mean(SNP_sen_list),
             mean(HMM_sen_list),
@@ -478,7 +566,6 @@ Sensitivity_iter<- function(iteration,l, e, mat_p){
             sd(HMM_prec_list)/sqrt(length(HMM_prec_list))))
   #return (c(mean(SNP_sen_list), mean(HMM_sen_list)))
 }
-
 
 ```
 
@@ -713,7 +800,7 @@ test multi-threads with MatP
 
 numberOfBlock <- 3
 #legnth of each block
-l <- c(10,10,10)
+l <- c(10,100,10)
 # expression level of each block
 e <- c(10,10,10)
 mat_p <- c(0.5,0.9,0.5)
@@ -724,10 +811,11 @@ m_test <- function(mat_p_2, iteration){
   mat_p=c(0.5,mat_p_2,0.5)
   #print(mat_p)
   aveS = Sensitivity_iter(iteration,l, e, mat_p)
+  #aveS = Precision_recall_specificity_iter(iteration,l, e, mat_p)
   return(c(mat_p_2,aveS))
 }
 
-test=mclapply(seq(0.1,0.9,0.05),FUN=function(idx){m_test(idx,1000)}, mc.cores = 50)
+test=mclapply(seq(0.1,0.9,0.05),FUN=function(idx){m_test(idx,10)}, mc.cores = 1)
 
 result=unlist(test)
 
@@ -778,7 +866,7 @@ test multi-threads with expression level
 ## test multi-threads with expression level
 numberOfBlock <- 3
 #legnth of each block
-l <- c(10,20,10)
+l <- c(10,100,10)
 # expression level of each block
 e <- c(10,10,10)
 mat_p <- c(0.5,0.9,0.5)
@@ -789,7 +877,7 @@ e_test <- function(e_2, iteration){
   aveS = Sensitivity_iter(iteration,l, e, mat_p)
   return(c(e_2,aveS))
 }
-e_test_out=mclapply(seq(1,50,1),FUN=function(idx){e_test(idx,1000)}, mc.cores = 10)
+e_test_out=mclapply(seq(1,50,1),FUN=function(idx){e_test(idx,10)}, mc.cores = 1)
 
 
 result=unlist(e_test_out)
@@ -849,7 +937,7 @@ mat_p <- c(0.5,0.9,0.5)
 library(parallel)
 l_test <- function(l_2, iteration){
   l=c(10, l_2, 10)
-  aveS = Sensitivity_iter(iteration,l, e, mat_p)
+  aveS = Precision_recall_specificity_iter(iteration,l, e, mat_p)
   return(c(l_2,aveS))
 }
 
@@ -898,7 +986,7 @@ ggplot(m, aes(x=trait, y=senMean, colour=method)) +
     #theme_bw()
 dev.off()
 pdf("length_SMS_OD0_e10_specificity_iter1K.pdf")
-ggplot(m, aes(x=length, y=specMean, colour=method)) + 
+ggplot(m, aes(x=trait, y=specMean, colour=method)) + 
     geom_errorbar(aes(ymin=specMean-specSE, ymax=specMean+specSE), width=.01) +
     geom_line() +
     geom_point() +
@@ -1320,7 +1408,7 @@ sim_HMM_block_betaBino <- function(BlockLength, ExpressionLevel, MatBinoP, OD){
 # expression level of each block
 #e <- c(10,10,10)
 #mat_p <- c(0.5,0.9,0.5)
-#od <- c(0.01, 0, 0.01)
+#od <- c(0.25, 0.25, 0.25)
 
 Sensitivity_betaBino<- function(l, e, mat_p, od, t){
   # Simulation of 3 HMM blocks (Sym-Mat-Sym)
@@ -1346,8 +1434,8 @@ Sensitivity_betaBino<- function(l, e, mat_p, od, t){
   }
 
  blockList$AlleleDB_state <- "S"
- blockList$AlleleDB_state[blockList$AlleleDB_p_value <0.05 & blockList$SimState!="S" & blockList$mat_reads/blockList$total_reads >= 0.5] <- "M"
- blockList$AlleleDB_state[blockList$AlleleDB_p_value <0.05 & blockList$SimState!="S" & blockList$mat_reads/blockList$total_reads < 0.5] <- "P" 
+ blockList$AlleleDB_state[blockList$AlleleDB_p_value <0.05 & blockList$mat_reads/blockList$total_reads >= 0.5] <- "M"
+ blockList$AlleleDB_state[blockList$AlleleDB_p_value <0.05 & blockList$mat_reads/blockList$total_reads < 0.5] <- "P" 
  
  
   ## HMM prediction
@@ -1392,37 +1480,50 @@ Sensitivity_betaBino<- function(l, e, mat_p, od, t){
  blockList$HMM_accum_total_reads <- hmm_result$accum_total_reads
  blockList$HMM_accum_mat_reads<- hmm_result$accum_mat_reads
  blockList$HMM_state<- hmm_result$hmm_state
- ##test Sensitivity
- if (mat_p[2] >0.5){
-   if (sum(blockList$SimState!="S") !=0) {
-     SNP_Sensitivity = sum(blockList$AlleleDB_state=="M" & blockList$SimState=="M") /sum(blockList$SimState =="M") 
-     AlleleHMM_Sensitivity = sum(blockList$HMM_p_value <0.05 & blockList$HMM_state=="M" & blockList$SimState=="M") /sum(blockList$SimState=="M") 
-   }  else{
-     SNP_Sensitivity = sum(blockList$AlleleDB_state=="M" & blockList$SimState=="M") /(sum(blockList$SimState=="M")+1) 
-     AlleleHMM_Sensitivity = sum(blockList$HMM_p_value <0.05 & blockList$HMM_state=="M" & blockList$SimState=="M") /(sum(blockList$SimState=="M")+1) 
+
+### calculate TP, FP, TN, N  # includes all SNPs at three blocks
+  if (mat_p[2] >0.5){
+     P=sum(blockList$SimState =="M") 
+     SNP_TP = sum(blockList$AlleleDB_p_value < 0.05 & blockList$AlleleDB_state=="M" & blockList$SimState=="M")
+     HMM_TP = sum(blockList$HMM_p_value <0.05 & blockList$HMM_state=="M" & blockList$SimState=="M") 
+ } else{
+   P=sum(blockList$SimState =="P") 
+   SNP_TP = sum(blockList$AlleleDB_p_value < 0.05 & blockList$AlleleDB_state=="P" & blockList$SimState=="P")
+   HMM_TP = sum(blockList$HMM_p_value <0.05 & blockList$HMM_state=="P" & blockList$SimState=="P")
    }
+
+ SNP_FP = sum(blockList$AlleleDB_p_value <0.05 & blockList$SimState =="S")   #incldue padding blocks
+ HMM_FP = sum(blockList$HMM_p_value <0.05 & blockList$HMM_state !="S" & blockList$SimState=="S") #incldue padding blocks
+ 
+ N=sum(blockList$SimState=="S")   #incldue padding blocks
+ 
+SNP_TN=sum(blockList$AlleleDB_p_value >=0.05 & blockList$SimState=="S")   #incldue padding blocks
+HMM_TN=sum(blockList$HMM_state=="S" & blockList$SimState=="S")   #incldue padding blocks
+
+ 
+##test Sensitivity
+ if (P !=0) {
+   SNP_Sensitivity = SNP_TP/P
+   AlleleHMM_Sensitivity =HMM_TP /P
+ }  else{
+    SNP_Sensitivity = 0
+   AlleleHMM_Sensitivity = 0
  }
- else{
-   if (sum(blockList$SimState!="S") !=0) {
-     SNP_Sensitivity = sum(blockList$AlleleDB_state=="P" & blockList$SimState=="P") /sum(blockList$SimState =="P") 
-     AlleleHMM_Sensitivity = sum(blockList$HMM_p_value <0.05 & blockList$HMM_state=="P" & blockList$SimState=="P") /sum(blockList$SimState=="P") 
-   }  else{
-     SNP_Sensitivity = sum(blockList$AlleleDB_state=="P" & blockList$SimState=="P") /(sum(blockList$SimState=="P")+1) 
-     AlleleHMM_Sensitivity = sum(blockList$HMM_p_value <0.05 & blockList$HMM_state=="P" & blockList$SimState=="P") /(sum(blockList$SimState=="P")+1) 
-   }
- }
+ 
  # specificity
-    SNP_Specificity = sum(blockList$AlleleDB_p_value >=0.05 & blockList$SimState=="S") /sum(blockList$SimState=="S") 
-   AlleleHMM_Specificity = sum(blockList$HMM_state=="S" & blockList$SimState=="S") /sum(blockList$SimState=="S") 
- #print(AlleleHMM_Specificity)
-   
+    SNP_Specificity = SNP_TN /N
+   AlleleHMM_Specificity = HMM_TN /N
+ 
   return (list(SNP_Sensitivity=SNP_Sensitivity, 
                AlleleHMM_Sensitivity=AlleleHMM_Sensitivity,
                SNP_Specificity = SNP_Specificity,
-               AlleleHMM_Specificity = AlleleHMM_Specificity
+               AlleleHMM_Specificity = AlleleHMM_Specificity,
+               P_Counts=c(P,SNP_TP, HMM_TP, SNP_FP, HMM_FP),
+               N_Counts=c(N, SNP_TN, HMM_TN)
                #, data=blockList 
                ))
 }
+
 
 Sensitivity_betaBino_iter<- function(iteration,l, e, mat_p, od, t=1e-5){
   SNP_sen_list=c()
@@ -1447,6 +1548,79 @@ Sensitivity_betaBino_iter<- function(iteration,l, e, mat_p, od, t=1e-5){
 }
 
 
+Precision_recall_specificity_betaBino_iter<- function(iteration,l, e, mat_p, od, t=1e-5){
+  SNP_sen_list=c()
+  HMM_sen_list=c()
+  SNP_spec_list=c()
+  HMM_spec_list=c()
+  SNP_prec_list=c()
+  HMM_prec_list=c()
+  
+  for (i in 1:iteration) {
+    #print (i)
+    m = Sensitivity_betaBino(l, e, mat_p, od, t)  #SMS blocks
+    s = Sensitivity_betaBino(l, e, c(0.5,0.5,0.5), od, t) #SSS blocks
+    P = m$P_Counts[1] #+s$P_Counts[1]        
+    SNP_TP = m$P_Counts[2] #+s$P_Counts[2]
+    HMM_TP = m$P_Counts[3] #+s$P_Counts[3]    
+    
+    SNP_FP = s$P_Counts[4] +m$P_Counts[4]   #SMS and SSS
+    HMM_FP = s$P_Counts[5] +m$P_Counts[5]  #SMS and SSS
+    N = s$N_Counts[1] + m$N_Counts[1]
+    SNP_TN = s$N_Counts[2] + m$N_Counts[2]
+    HMM_TN = s$N_Counts[3] + m$N_Counts[3]
+
+ ## Sensitivity TP/P
+ if (P !=0) {
+   SNP_Sensitivity = SNP_TP/P
+   AlleleHMM_Sensitivity =HMM_TP /P
+ }  else{
+    SNP_Sensitivity = 0
+   AlleleHMM_Sensitivity = 0
+ }
+ 
+ # precision = TP/TP+FP
+    if (SNP_TP == 0){
+      SNP_precision = 0
+    } else{
+      SNP_precision = SNP_TP /(SNP_TP+SNP_FP)
+    }
+    if (HMM_TP == 0){
+      AlleleHMM_precision = 0
+    } else{
+      AlleleHMM_precision = HMM_TP /(HMM_TP+HMM_FP)
+    }
+    
+ # specificity
+  SNP_Specificity = SNP_TN /N
+  AlleleHMM_Specificity = HMM_TN /N
+ #print(AlleleHMM_Specificity)
+
+
+    
+    SNP_sen_list=c(SNP_sen_list, SNP_Sensitivity)
+    HMM_sen_list=c(HMM_sen_list, AlleleHMM_Sensitivity)
+    SNP_spec_list=c(SNP_spec_list, SNP_Specificity)
+    HMM_spec_list=c(HMM_spec_list, AlleleHMM_Specificity)
+    SNP_prec_list=c(SNP_prec_list, SNP_precision)
+    HMM_prec_list=c(HMM_prec_list, AlleleHMM_precision)
+  }
+  return (c(mean(SNP_sen_list),
+            mean(HMM_sen_list),
+            sd(SNP_sen_list)/sqrt(length(SNP_sen_list)),
+            sd(HMM_sen_list)/sqrt(length(HMM_sen_list)),
+            mean(SNP_spec_list),
+            mean(HMM_spec_list),
+            sd(SNP_spec_list)/sqrt(length(SNP_spec_list)),
+            sd(HMM_spec_list)/sqrt(length(HMM_spec_list)),
+            mean(SNP_prec_list),
+            mean(HMM_prec_list),
+            sd(SNP_prec_list)/sqrt(length(SNP_prec_list)),
+            sd(HMM_prec_list)/sqrt(length(HMM_prec_list))))
+  #return (c(mean(SNP_sen_list), mean(HMM_sen_list)))
+}
+
+
 ```
 
 test multi-threads with MatP in betaBinomial
@@ -1466,12 +1640,13 @@ m_test <- function(mat_p_2, iteration){
   #mat_p_list = c(mat_p_list, mat_p_2) 
   mat_p=c(0.5,mat_p_2,0.5)
   #print(mat_p)
-  aveS = Sensitivity_betaBino_iter(iteration,l, e, mat_p, od)
+  #aveS = Sensitivity_betaBino_iter(iteration,l, e, mat_p, od)
+  aveS = Precision_recall_specificity_betaBino_iter(iteration,l, e, mat_p, od)
   return(c(mat_p_2,aveS))
 }
 
 #test=mclapply(seq(0,1,0.05),FUN=function(idx){m_test(idx,iteration = 1000)}, mc.cores = 50)
-test=mclapply(seq(0,1,0.1),FUN=function(idx){m_test(idx,iteration = 3)}, mc.cores = 1)
+test=mclapply(seq(0,1,0.05),FUN=function(idx){m_test(idx,iteration = 10)}, mc.cores = 1)
 result=unlist(test)
 
 m1=data.frame(result[seq(1,length(result),9)],
