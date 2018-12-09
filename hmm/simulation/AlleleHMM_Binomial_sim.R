@@ -23,7 +23,7 @@ l <- c(10,100,10)
 e <- c(10,10,10)
 mat_p <- c(0.5,0.9,0.5)
 
-Sensitivity<- function(l, e, mat_p){
+Sensitivity<- function(l, e, mat_p, t=1e-5){
   # Simulation of 3 HMM blocks (Sym-Mat-Sym)
   i=1
   blockList=data.frame(sim_HMM_block(l[i],e[i], mat_p[i]), blockID=i)
@@ -45,7 +45,7 @@ Sensitivity<- function(l, e, mat_p){
   }
 
  ## HMM prediction
-  system(paste("python HMM_prediction.py","-i",b_tmp), wait=TRUE)
+  system(paste("python HMM_prediction.py","-i",b_tmp, "-t", t), wait=TRUE)
  ## HMM binomial test
  
  # combine the reads in the same HMM blocks and perform bionomial test
@@ -139,7 +139,8 @@ HMM_TN=sum(blockList$HMM_state=="S" & blockList$SimState=="S")   #incldue paddin
                ))
 }
 
-Precision_recall_specificity_iter<- function(iteration,l, e, mat_p){
+
+Precision_recall_specificity_iter<- function(iteration,l, e, mat_p, t=1e-5){
   SNP_sen_list=c()
   HMM_sen_list=c()
   SNP_spec_list=c()
@@ -151,15 +152,15 @@ Precision_recall_specificity_iter<- function(iteration,l, e, mat_p){
     #print (i)
     m = Sensitivity(l, e, mat_p)  #SMS blocks
     s = Sensitivity(l, e,  c(0.5,0.5,0.5))  #SSS blocks
-    P = m$P_Counts[1] #+s$P_Counts[1]        
-    SNP_TP = m$P_Counts[2] #+s$P_Counts[2]
-    HMM_TP = m$P_Counts[3] #+s$P_Counts[3]    
+    P = m$P_Counts[1] #SMS
+    SNP_TP = m$P_Counts[2] #SMS
+    HMM_TP = m$P_Counts[3] #SMS
     
-    SNP_FP = s$P_Counts[4] +m$P_Counts[4]   #SMS and SSS
-    HMM_FP = s$P_Counts[5] +m$P_Counts[5]  #SMS and SSS
-    N = s$N_Counts[1] + m$N_Counts[1]
-    SNP_TN = s$N_Counts[2] + m$N_Counts[2]
-    HMM_TN = s$N_Counts[3] + m$N_Counts[3]
+    SNP_FP = s$P_Counts[4] # SSS
+    HMM_FP = s$P_Counts[5] # SSS
+    N = s$N_Counts[1] # SSS
+    SNP_TN = s$N_Counts[2] # SSS
+    HMM_TN = s$N_Counts[3] # SSS
 
  ## Sensitivity TP/P
  if (P !=0) {
@@ -177,9 +178,9 @@ Precision_recall_specificity_iter<- function(iteration,l, e, mat_p){
       SNP_precision = SNP_TP /(SNP_TP+SNP_FP)
     }
     if (HMM_TP == 0){
-      HMM_precision = 0
+      AlleleHMM_precision = 0
     } else{
-      HMM_precision = HMM_TP /(HMM_TP+HMM_FP)
+      AlleleHMM_precision = HMM_TP /(HMM_TP+HMM_FP)
     }
     
  # specificity
@@ -211,7 +212,7 @@ Precision_recall_specificity_iter<- function(iteration,l, e, mat_p){
   #return (c(mean(SNP_sen_list), mean(HMM_sen_list)))
 }
 
-```
+
 Get_table_from_simulation <- function(test){
 
 result=unlist(test)
@@ -258,7 +259,7 @@ m_test <- function(mat_p_2, iteration){
   return(c(mat_p_2,aveS))
 }
 
-test=mclapply(seq(0.1,0.9,0.05),FUN=function(idx){m_test(idx,1000)}, mc.cores = 50)
+test=mclapply(seq(0,1,0.05),FUN=function(idx){m_test(idx,1000)}, mc.cores = 50)
 
 m=Get_table_from_simulation(test)
 write.table(m, file = "MatP_SMS_OD0_e10_l100_sensitivity_and_precision_iter1K.txt", quote = F, sep = "\t",row.names = F)
@@ -351,6 +352,29 @@ e_test_out=mclapply(seq(1,50,1),FUN=function(idx){e_test(idx,1000)}, mc.cores = 
 
 m=Get_table_from_simulation(e_test_out)
 write.table(m, file = "expression_SMS_OD0_l100_sensitivity_and_precision_iter1K.txt", quote = F, sep = "\t",row.names = F)
+
+pdf("exp_SMS_OD0_e10_l100_sensitivity_iter1k.pdf")
+ggplot(m, aes(x=trait, y=senMean, colour=method)) + 
+    geom_errorbar(aes(ymin=senMean-senSE, ymax=senMean+senSE), width=.01) +
+    geom_line() +
+    geom_point() +    
+   scale_color_manual(values=c("red", "blue")) +
+    theme(axis.text=element_text(size=14),
+        axis.title=element_text(size=16,face="bold"))+
+  xlab("read counts")
+    #theme_bw()
+dev.off()
+pdf("exp_SMS_OD0_e10_l100_specificity_iter1k.pdf")
+ggplot(m, aes(x=trait, y=specMean, colour=method)) + 
+    geom_errorbar(aes(ymin=specMean-specSE, ymax=specMean+specSE), width=.01) +
+    geom_line() +
+    geom_point()+    
+   scale_color_manual(values=c("red", "blue")) +
+    theme(axis.text=element_text(size=14),
+        axis.title=element_text(size=16,face="bold"))+
+  xlab("read counts")
+    #theme_bw()
+dev.off()
 
 pdf("exp_SMS_OD0_l100_precision_iter1K.pdf")
 ggplot(m, aes(x=trait, y=precMean, colour=method)) + 
