@@ -54,7 +54,7 @@ Sensitivity_betaBino<- function(l, e, mat_p, od, t){
   }
 
  blockList$AlleleDB_state <- "S"
- blockList$AlleleDB_state[blockList$AlleleDB_p_value <0.05 & blockList$mat_reads/blockList$total_reads >= 0.5] <- "M"
+ blockList$AlleleDB_state[blockList$AlleleDB_p_value <0.05 & blockList$mat_reads/blockList$total_reads > 0.5] <- "M"
  blockList$AlleleDB_state[blockList$AlleleDB_p_value <0.05 & blockList$mat_reads/blockList$total_reads < 0.5] <- "P" 
  
  
@@ -101,60 +101,107 @@ Sensitivity_betaBino<- function(l, e, mat_p, od, t){
  blockList$HMM_accum_mat_reads<- hmm_result$accum_mat_reads
  blockList$HMM_state<- hmm_result$hmm_state
 
- # sensitivity
- if (sum(blockList$SimState!="S") !=0) {
-     SNP_Sensitivity = sum(blockList$AlleleDB_p_value < 0.05 & blockList$SimState!="S") /sum(blockList$SimState !="S") 
-     AlleleHMM_Sensitivity = sum(blockList$HMM_p_value <0.05 & blockList$SimState!="S") /sum(blockList$SimState !="S") 
-   }  else{
-      SNP_Sensitivity = sum(blockList$AlleleDB_p_value < 0.05 & blockList$SimState!="S") /(sum(blockList$SimState !="S")+1)  
-     AlleleHMM_Sensitivity = sum(blockList$HMM_p_value <0.05 & blockList$SimState!="S") /(sum(blockList$SimState !="S")+1)
+### calculate TP, FP, TN, N  # includes all SNPs at three blocks
+  if (mat_p[2] >0.5){
+     P=sum(blockList$SimState =="M") 
+     SNP_TP = sum(blockList$AlleleDB_p_value < 0.05 & blockList$AlleleDB_state=="M" & blockList$SimState=="M")
+     HMM_TP = sum(blockList$HMM_p_value <0.05 & blockList$HMM_state=="M" & blockList$SimState=="M") 
+ } else{
+   P=sum(blockList$SimState =="P") 
+   SNP_TP = sum(blockList$AlleleDB_p_value < 0.05 & blockList$AlleleDB_state=="P" & blockList$SimState=="P")
+   HMM_TP = sum(blockList$HMM_p_value <0.05 & blockList$HMM_state=="P" & blockList$SimState=="P")
    }
+
+ SNP_FP = sum(blockList$AlleleDB_p_value <0.05 & blockList$SimState =="S")   #incldue padding blocks
+ HMM_FP = sum(blockList$HMM_p_value <0.05 & blockList$HMM_state !="S" & blockList$SimState=="S") #incldue padding blocks
  
-  # precision = TP/TP+FP
-  if (sum(blockList$AlleleDB_p_value <0.05) !=0) {
-   SNP_precision = sum(blockList$AlleleDB_p_value <0.05 & blockList$SimState!="S") /sum(blockList$AlleleDB_p_value <0.05)
-  }  else{   
-      SNP_precision = sum(blockList$AlleleDB_p_value <0.05 & blockList$SimState!="S") /(sum(blockList$AlleleDB_p_value <0.05)+1)
-  }
- if (sum(blockList$HMM_p_value <0.05) !=0){
-   AlleleHMM_precision = sum(blockList$HMM_p_value <0.05 & blockList$SimState!="S") /sum(blockList$HMM_p_value <0.05)
- } else {
-      AlleleHMM_precision = sum(blockList$HMM_p_value <0.05 & blockList$SimState!="S") /(sum(blockList$HMM_p_value <0.05)+1)
-  }
+ N=sum(blockList$SimState=="S")   #incldue padding blocks
  
+SNP_TN=sum(blockList$AlleleDB_p_value >=0.05 & blockList$SimState=="S")   #incldue padding blocks
+HMM_TN=sum(blockList$HMM_state=="S" & blockList$SimState=="S")   #incldue padding blocks
+
  
+##test Sensitivity
+ if (P !=0) {
+   SNP_Sensitivity = SNP_TP/P
+   AlleleHMM_Sensitivity =HMM_TP /P
+ }  else{
+    SNP_Sensitivity = 0
+   AlleleHMM_Sensitivity = 0
+ }
  
  # specificity
-    SNP_Specificity = sum(blockList$AlleleDB_p_value >=0.05 & blockList$SimState=="S") /sum(blockList$SimState=="S") 
-   AlleleHMM_Specificity = sum(blockList$HMM_state=="S" & blockList$SimState=="S") /sum(blockList$SimState=="S") 
- #print(AlleleHMM_Specificity)
-   
-    return (list(SNP_Sensitivity=SNP_Sensitivity, 
+    SNP_Specificity = SNP_TN /N
+   AlleleHMM_Specificity = HMM_TN /N
+ 
+  return (list(SNP_Sensitivity=SNP_Sensitivity, 
                AlleleHMM_Sensitivity=AlleleHMM_Sensitivity,
                SNP_Specificity = SNP_Specificity,
                AlleleHMM_Specificity = AlleleHMM_Specificity,
-               SNP_precision = SNP_precision,
-               AlleleHMM_precision = AlleleHMM_precision 
+               P_Counts=c(P,SNP_TP, HMM_TP, SNP_FP, HMM_FP),
+               N_Counts=c(N, SNP_TN, HMM_TN)
                #, data=blockList 
                ))
 }
 
-Sensitivity_betaBino_iter<- function(iteration,l, e, mat_p, od, t=1e-5){
+
+
+Precision_recall_specificity_betaBino_iter<- function(iteration,l, e, mat_p, od, t=1e-5){
   SNP_sen_list=c()
   HMM_sen_list=c()
   SNP_spec_list=c()
   HMM_spec_list=c()
   SNP_prec_list=c()
   HMM_prec_list=c()
+  
   for (i in 1:iteration) {
     #print (i)
-    s=Sensitivity_betaBino(l, e, mat_p, od, t)
-    SNP_sen_list=c(SNP_sen_list, s$SNP_Sensitivity)
-    HMM_sen_list=c(HMM_sen_list, s$AlleleHMM_Sensitivity)
-    SNP_spec_list=c(SNP_spec_list, s$SNP_Specificity)
-    HMM_spec_list=c(HMM_spec_list, s$AlleleHMM_Specificity)
-    SNP_prec_list=c(SNP_prec_list, s$SNP_precision)
-    HMM_prec_list=c(HMM_prec_list, s$AlleleHMM_precision)
+    m = Sensitivity_betaBino(l, e, mat_p, od, t)  #SMS blocks
+    s = Sensitivity_betaBino(l, e, c(0.5,0.5,0.5), od, t) #SSS blocks
+    P = m$P_Counts[1] #SMS    
+    SNP_TP = m$P_Counts[2] #SMS
+    HMM_TP = m$P_Counts[3] #SMS  
+    
+    SNP_FP = s$P_Counts[4]  #SSS
+    HMM_FP = s$P_Counts[5]  #SSS
+    N = s$N_Counts[1] #SSS
+    SNP_TN = s$N_Counts[2] #SSS
+    HMM_TN = s$N_Counts[3] #SSS
+
+ ## Sensitivity TP/P
+ if (P !=0) {
+   SNP_Sensitivity = SNP_TP/P
+   AlleleHMM_Sensitivity =HMM_TP /P
+ }  else{
+    SNP_Sensitivity = 0
+   AlleleHMM_Sensitivity = 0
+ }
+ 
+ # precision = TP/TP+FP
+    if (SNP_TP == 0){
+      SNP_precision = 0
+    } else{
+      SNP_precision = SNP_TP /(SNP_TP+SNP_FP)
+    }
+    if (HMM_TP == 0){
+      AlleleHMM_precision = 0
+    } else{
+      AlleleHMM_precision = HMM_TP /(HMM_TP+HMM_FP)
+    }
+    
+ # specificity
+  SNP_Specificity = SNP_TN /N
+  AlleleHMM_Specificity = HMM_TN /N
+ #print(AlleleHMM_Specificity)
+
+
+    
+    SNP_sen_list=c(SNP_sen_list, SNP_Sensitivity)
+    HMM_sen_list=c(HMM_sen_list, AlleleHMM_Sensitivity)
+    SNP_spec_list=c(SNP_spec_list, SNP_Specificity)
+    HMM_spec_list=c(HMM_spec_list, AlleleHMM_Specificity)
+    SNP_prec_list=c(SNP_prec_list, SNP_precision)
+    HMM_prec_list=c(HMM_prec_list, AlleleHMM_precision)
   }
   return (c(mean(SNP_sen_list),
             mean(HMM_sen_list),
@@ -170,3 +217,258 @@ Sensitivity_betaBino_iter<- function(iteration,l, e, mat_p, od, t=1e-5){
             sd(HMM_prec_list)/sqrt(length(HMM_prec_list))))
   #return (c(mean(SNP_sen_list), mean(HMM_sen_list)))
 }
+
+
+
+Get_table_from_simulation <- function(test){
+
+result=unlist(test)
+outout_length=12+1
+
+m1=data.frame(result[seq(1,length(result),outout_length)],
+              result[seq(2,length(result),outout_length)], 
+              result[seq(4,length(result),outout_length)],
+              result[seq(6,length(result),outout_length)],
+              result[seq(8,length(result),outout_length)],
+              result[seq(10,length(result),outout_length)],
+              result[seq(12,length(result),outout_length)])
+names(m1)=c("trait","senMean", "senSE", "specMean", "specSE", "precMean","precSE")
+m1$method="SNP independantly"
+#View(m)
+m2=data.frame(result[seq(1,length(result),outout_length)],
+              result[seq(3,length(result),outout_length)], 
+              result[seq(5,length(result),outout_length)],
+              result[seq(7,length(result),outout_length)],
+              result[seq(9,length(result),outout_length)],
+              result[seq(11,length(result),outout_length)],
+              result[seq(13,length(result),outout_length)])
+names(m2)=c("trait","senMean", "senSE", "specMean", "specSE", "precMean","precSE")
+m2$method="Allele HMM"
+m=rbind.data.frame(m1,m2)
+}
+
+
+## test multi-threads with MatP
+
+numberOfBlock <- 3
+#legnth of each block
+l <- c(10,100,10)
+# expression level of each block
+e <- c(10,10,10)
+mat_p <- c(0.5,0.9,0.5)
+od <- c(0.25, 0.25, 0.25)
+
+library(parallel)
+m_test <- function(mat_p_2, iteration){
+  #mat_p_list = c(mat_p_list, mat_p_2) 
+  mat_p=c(0.5,mat_p_2,0.5)
+  #print(mat_p)
+  aveS = Precision_recall_specificity_betaBino_iter(iteration,l, e, mat_p, od)
+  return(c(mat_p_2,aveS))
+}
+
+test=mclapply(seq(0,1,0.05),FUN=function(idx){m_test(idx,1000)}, mc.cores = 50)
+
+
+m=Get_table_from_simulation(test)
+write.table(m, file = "MatP_SMS_OD0.25_e10_l100_sensitivity_and_precision_iter1K.txt", quote = F, sep = "\t",row.names = F)
+
+#m=read.table("MatP_SMS_OD0_e10_l100_sensitivity_and_precision_iter1K.txt", header=T,sep = "\t")
+library(ggplot2)
+pdf("MatP_SMS_OD0.25_e10_l100_sensitivity_iter1k.pdf")
+ggplot(m, aes(x=trait, y=senMean, colour=method)) + 
+    geom_errorbar(aes(ymin=senMean-senSE, ymax=senMean+senSE), width=.01) +
+    geom_line() +
+    geom_point() +    
+   scale_color_manual(values=c("red", "blue")) +
+    theme(axis.text=element_text(size=14),
+        axis.title=element_text(size=16,face="bold"))+
+  xlab("Mat reads fraction")
+    #theme_bw()
+dev.off()
+pdf("MatP_SSS_OD0.25_e10_l100_specificity_iter1k.pdf")
+ggplot(m, aes(x=trait, y=specMean, colour=method)) + 
+    geom_errorbar(aes(ymin=specMean-specSE, ymax=specMean+specSE), width=.01) +
+    geom_line() +
+    geom_point()+    
+   scale_color_manual(values=c("red", "blue")) +
+    theme(axis.text=element_text(size=14),
+        axis.title=element_text(size=16,face="bold"))+
+  xlab("Mat reads fraction")
+    #theme_bw()
+dev.off()
+
+
+pdf("MatP_SMS_OD0.25_e10_l100_precision_iter1K.pdf")
+ggplot(m, aes(x=trait, y=precMean, colour=method)) + 
+    geom_errorbar(aes(ymin=precMean-precSE, ymax=precMean+precSE), width=.01) +
+    geom_line() +
+    geom_point() +
+    scale_color_manual(values=c("red", "blue")) +
+    theme(axis.text=element_text(size=14),
+        axis.title=element_text(size=16,face="bold"))+
+  xlab("Mat reads fraction")
+    #theme_bw()
+dev.off()
+
+
+pdf("MatP_SMS_OD0.25_e10_l100_precision_recall_iter1K.pdf")
+ggplot(m, aes(x=senMean, y=precMean, colour=method)) + 
+#    geom_errorbar(aes(ymin=precMean-precSE, ymax=precMean+precSE), width=.01) +
+    geom_line() +
+    geom_point() +
+    scale_color_manual(values=c("red", "blue")) +
+    theme(axis.text=element_text(size=14),
+        axis.title=element_text(size=16,face="bold"))+
+    xlab("recall")+
+    ylab("precision")+
+    ggtitle("Mat reads fraction")
+    #theme_bw()
+dev.off()
+
+
+
+### expression level###
+numberOfBlock <- 3
+#legnth of each block
+l <- c(10,100,10)
+# expression level of each block
+e <- c(10,10,10)
+mat_p <- c(0.5,0.9,0.5)
+od <- c(0.25, 0.25, 0.25)
+
+library(parallel)
+e_test <- function(e_2, iteration){
+  e=c(10, e_2, 10)
+  aveS = Precision_recall_specificity_betaBino_iter(iteration,l, e, mat_p, od, t=1e-5) 
+  return(c(e_2,aveS))
+}
+e_test_out=mclapply(seq(1,50,1),FUN=function(idx){e_test(idx,1000)}, mc.cores = 50)
+
+m=Get_table_from_simulation(e_test_out)
+write.table(m, file = "exp_OD0.25_l100_sensitivity_and_precision_iter1K.txt", quote = F, sep = "\t",row.names = F)
+
+#m=read.table("MatP_SMS_OD0_e10_l100_sensitivity_and_precision_iter1K.txt", header=T,sep = "\t")
+library(ggplot2)
+pdf("exp_OD0.25_l100_sensitivity_iter1k.pdf")
+ggplot(m, aes(x=trait, y=senMean, colour=method)) + 
+    geom_errorbar(aes(ymin=senMean-senSE, ymax=senMean+senSE), width=.01) +
+    geom_line() +
+    geom_point() +    
+   scale_color_manual(values=c("red", "blue")) +
+    theme(axis.text=element_text(size=14),
+        axis.title=element_text(size=16,face="bold"))+
+  xlab("read count")
+    #theme_bw()
+dev.off()
+pdf("exp_OD0.25_e10_l100_specificity_iter1k.pdf")
+ggplot(m, aes(x=trait, y=specMean, colour=method)) + 
+    geom_errorbar(aes(ymin=specMean-specSE, ymax=specMean+specSE), width=.01) +
+    geom_line() +
+    geom_point()+    
+   scale_color_manual(values=c("red", "blue")) +
+    theme(axis.text=element_text(size=14),
+        axis.title=element_text(size=16,face="bold"))+
+  xlab("read count")
+    #theme_bw()
+dev.off()
+
+
+pdf("exp_OD0.25_l100_precision_iter1K.pdf")
+ggplot(m, aes(x=trait, y=precMean, colour=method)) + 
+    geom_errorbar(aes(ymin=precMean-precSE, ymax=precMean+precSE), width=.01) +
+    geom_line() +
+    geom_point() +
+    scale_color_manual(values=c("red", "blue")) +
+    theme(axis.text=element_text(size=14),
+        axis.title=element_text(size=16,face="bold"))+
+  xlab("read count")
+    #theme_bw()
+dev.off()
+
+
+pdf("exp_OD0.25_l100_precision_recall_iter1K.pdf")
+ggplot(m, aes(x=senMean, y=precMean, colour=method)) + 
+#    geom_errorbar(aes(ymin=precMean-precSE, ymax=precMean+precSE), width=.01) +
+    geom_line() +
+    geom_point() +
+    scale_color_manual(values=c("red", "blue")) +
+    theme(axis.text=element_text(size=14),
+        axis.title=element_text(size=16,face="bold"))+
+    xlab("recall")+
+    ylab("precision")+
+    ggtitle("read count")
+    #theme_bw()
+dev.off()
+
+
+### length ####
+numberOfBlock <- 3
+#legnth of each block
+l <- c(10,100,10)
+# expression level of each block
+e <- c(10,10,10)
+mat_p <- c(0.5,0.9,0.5)
+od <- c(0.25, 0.25, 0.25)
+
+l_test <- function(l_2, iteration){
+  l=c(10, l_2, 10)
+  aveS = Precision_recall_specificity_betaBino_iter(iteration,l, e, mat_p, od)
+  return(c(l_2,aveS))
+}
+
+l_test_out=mclapply(seq(1,50,1),FUN=function(idx){l_test(idx,1000)}, mc.cores = 50)
+
+
+m=Get_table_from_simulation(l_test_out)
+write.table(m, file = "length_SMS_OD0.25_e10_sensitivity_and_precision_iter1K.txt", quote = F, sep = "\t",row.names = F)
+
+library(ggplot2)
+pdf("length_SMS_OD0.25_e10_sensitivity_iter1K.pdf")
+ggplot(m, aes(x=trait, y=senMean, colour=method)) + 
+    geom_errorbar(aes(ymin=senMean-senSE, ymax=senMean+senSE), width=.01) +
+    geom_line() +
+    geom_point()+
+    scale_color_manual(values=c("red", "blue")) +
+    theme(axis.text=element_text(size=14),
+        axis.title=element_text(size=16,face="bold"))+
+  xlab("length") #+
+    #theme_bw()
+dev.off()
+pdf("length_SMS_OD0.25_e10_specificity_iter1K.pdf")
+ggplot(m, aes(x=trait, y=specMean, colour=method)) + 
+    geom_errorbar(aes(ymin=specMean-specSE, ymax=specMean+specSE), width=.01) +
+    geom_line() +
+    geom_point() +
+    scale_color_manual(values=c("red", "blue")) +
+    theme(axis.text=element_text(size=14),
+        axis.title=element_text(size=16,face="bold"))+
+  xlab("length") 
+    #theme_bw()
+dev.off()
+
+pdf("length_SMS_OD0.25_e10_precision_iter1K.pdf")
+ggplot(m, aes(x=trait, y=precMean, colour=method)) + 
+    geom_errorbar(aes(ymin=precMean-precSE, ymax=precMean+precSE), width=.01) +
+    geom_line() +
+    geom_point() +
+    scale_color_manual(values=c("red", "blue")) +
+    theme(axis.text=element_text(size=14),
+        axis.title=element_text(size=16,face="bold"))+
+  xlab("length")
+    #theme_bw()
+dev.off()
+
+pdf("length_SMS_OD0.25_e10_precision_recall_iter1K.pdf")
+ggplot(m, aes(x=senMean, y=precMean, colour=method)) + 
+#    geom_errorbar(aes(ymin=precMean-precSE, ymax=precMean+precSE), width=.01) +
+    geom_line() +
+    geom_point() +
+    scale_color_manual(values=c("red", "blue")) +
+    theme(axis.text=element_text(size=14),
+        axis.title=element_text(size=16,face="bold"))+
+    xlab("recall")+
+    ylab("precision")+
+    ggtitle("Center Block length")
+    #theme_bw()
+dev.off()
