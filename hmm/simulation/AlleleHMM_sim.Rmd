@@ -345,7 +345,7 @@ l <- c(10,100,10)
 e <- c(10,10,10)
 mat_p <- c(0.5,0.9,0.5)
 
-Sensitivity<- function(l, e, mat_p){
+Sensitivity<- function(l, e, mat_p, t=1e-5){
   # Simulation of 3 HMM blocks (Sym-Mat-Sym)
   i=1
   blockList=data.frame(sim_HMM_block(l[i],e[i], mat_p[i]), blockID=i)
@@ -367,7 +367,7 @@ Sensitivity<- function(l, e, mat_p){
   }
 
  ## HMM prediction
-  system(paste("python HMM_prediction.py","-i",b_tmp), wait=TRUE)
+  system(paste("python HMM_prediction.py","-i",b_tmp, "-t", t), wait=TRUE)
  ## HMM binomial test
  
  # combine the reads in the same HMM blocks and perform bionomial test
@@ -461,7 +461,7 @@ HMM_TN=sum(blockList$HMM_state=="S" & blockList$SimState=="S")   #incldue paddin
                ))
 }
 
-Sensitivity_iter<- function(iteration,l, e, mat_p){
+Sensitivity_iter<- function(iteration,l, e, mat_p, t=1e-5){
   SNP_sen_list=c()
   HMM_sen_list=c()
   SNP_spec_list=c()
@@ -495,7 +495,7 @@ Sensitivity_iter<- function(iteration,l, e, mat_p){
 }
 
 
-Precision_recall_specificity_iter<- function(iteration,l, e, mat_p){
+Precision_recall_specificity_iter<- function(iteration,l, e, mat_p, t=1e-5){
   SNP_sen_list=c()
   HMM_sen_list=c()
   SNP_spec_list=c()
@@ -507,15 +507,15 @@ Precision_recall_specificity_iter<- function(iteration,l, e, mat_p){
     #print (i)
     m = Sensitivity(l, e, mat_p)  #SMS blocks
     s = Sensitivity(l, e,  c(0.5,0.5,0.5))  #SSS blocks
-    P = m$P_Counts[1] #+s$P_Counts[1]        
-    SNP_TP = m$P_Counts[2] #+s$P_Counts[2]
-    HMM_TP = m$P_Counts[3] #+s$P_Counts[3]    
+    P = m$P_Counts[1] #SMS
+    SNP_TP = m$P_Counts[2] #SMS
+    HMM_TP = m$P_Counts[3] #SMS
     
-    SNP_FP = s$P_Counts[4] +m$P_Counts[4]   #SMS and SSS
-    HMM_FP = s$P_Counts[5] +m$P_Counts[5]  #SMS and SSS
-    N = s$N_Counts[1] + m$N_Counts[1]
-    SNP_TN = s$N_Counts[2] + m$N_Counts[2]
-    HMM_TN = s$N_Counts[3] + m$N_Counts[3]
+    SNP_FP = s$P_Counts[4] # SSS
+    HMM_FP = s$P_Counts[5] # SSS
+    N = s$N_Counts[1] # SSS
+    SNP_TN = s$N_Counts[2] # SSS
+    HMM_TN = s$N_Counts[3] # SSS
 
  ## Sensitivity TP/P
  if (P !=0) {
@@ -810,12 +810,33 @@ m_test <- function(mat_p_2, iteration){
   #mat_p_list = c(mat_p_list, mat_p_2) 
   mat_p=c(0.5,mat_p_2,0.5)
   #print(mat_p)
-  aveS = Sensitivity_iter(iteration,l, e, mat_p)
-  #aveS = Precision_recall_specificity_iter(iteration,l, e, mat_p)
+  #aveS = Sensitivity_iter(iteration,l, e, mat_p)
+  aveS = Precision_recall_specificity_iter(iteration,l, e, mat_p)
   return(c(mat_p_2,aveS))
 }
 
-test=mclapply(seq(0.1,0.9,0.05),FUN=function(idx){m_test(idx,10)}, mc.cores = 1)
+atest=mclapply(seq(0.1,0.9,0.05),FUN=function(idx){m_test(idx,10)}, mc.cores = 1)
+
+m=Get_table_from_simulation(atest)
+
+ggplot(m, aes(x=trait, y=senMean, colour=method)) +
+geom_errorbar(aes(ymin=senMean-senSE, ymax=senMean+senSE), width=.01) +
+geom_line() +
+geom_point()+
+scale_color_manual(values=c("red", "blue")) +
+theme(axis.text=element_text(size=14),
+axis.title=element_text(size=16,face="bold"))+
+xlab("matP")
+
+ggplot(m, aes(x=trait, y=precMean, colour=method)) +
+geom_errorbar(aes(ymin=precMean-precSE, ymax=precMean+precSE), width=.01) +
+geom_line() +
+geom_point() +
+scale_color_manual(values=c("red", "blue")) +
+theme(axis.text=element_text(size=14),
+axis.title=element_text(size=16,face="bold"))+
+xlab("matP")
+
 
 result=unlist(test)
 
@@ -874,7 +895,7 @@ mat_p <- c(0.5,0.9,0.5)
 library(parallel)
 e_test <- function(e_2, iteration){
   e=c(10, e_2, 10)
-  aveS = Sensitivity_iter(iteration,l, e, mat_p)
+  aveS = Precision_recall_specificity_iter(iteration,l, e, mat_p)
   return(c(e_2,aveS))
 }
 e_test_out=mclapply(seq(1,50,1),FUN=function(idx){e_test(idx,10)}, mc.cores = 1)
@@ -1434,7 +1455,7 @@ Sensitivity_betaBino<- function(l, e, mat_p, od, t){
   }
 
  blockList$AlleleDB_state <- "S"
- blockList$AlleleDB_state[blockList$AlleleDB_p_value <0.05 & blockList$mat_reads/blockList$total_reads >= 0.5] <- "M"
+ blockList$AlleleDB_state[blockList$AlleleDB_p_value <0.05 & blockList$mat_reads/blockList$total_reads > 0.5] <- "M"
  blockList$AlleleDB_state[blockList$AlleleDB_p_value <0.05 & blockList$mat_reads/blockList$total_reads < 0.5] <- "P" 
  
  
@@ -1560,15 +1581,15 @@ Precision_recall_specificity_betaBino_iter<- function(iteration,l, e, mat_p, od,
     #print (i)
     m = Sensitivity_betaBino(l, e, mat_p, od, t)  #SMS blocks
     s = Sensitivity_betaBino(l, e, c(0.5,0.5,0.5), od, t) #SSS blocks
-    P = m$P_Counts[1] #+s$P_Counts[1]        
-    SNP_TP = m$P_Counts[2] #+s$P_Counts[2]
-    HMM_TP = m$P_Counts[3] #+s$P_Counts[3]    
+    P = m$P_Counts[1] #SMS    
+    SNP_TP = m$P_Counts[2] #SMS
+    HMM_TP = m$P_Counts[3] #SMS  
     
-    SNP_FP = s$P_Counts[4] +m$P_Counts[4]   #SMS and SSS
-    HMM_FP = s$P_Counts[5] +m$P_Counts[5]  #SMS and SSS
-    N = s$N_Counts[1] + m$N_Counts[1]
-    SNP_TN = s$N_Counts[2] + m$N_Counts[2]
-    HMM_TN = s$N_Counts[3] + m$N_Counts[3]
+    SNP_FP = s$P_Counts[4]  #SSS
+    HMM_FP = s$P_Counts[5]  #SSS
+    N = s$N_Counts[1] #SSS
+    SNP_TN = s$N_Counts[2] #SSS
+    HMM_TN = s$N_Counts[3] #SSS
 
  ## Sensitivity TP/P
  if (P !=0) {
@@ -1623,6 +1644,110 @@ Precision_recall_specificity_betaBino_iter<- function(iteration,l, e, mat_p, od,
 
 ```
 
+test MatP in betaBinomial with differet OD
+```{r}
+## test multi-threads with MatP
+
+numberOfBlock <- 3
+#legnth of each block
+l <- c(10,100,10)
+# expression level of each block
+e <- c(10,10,10)
+mat_p <- c(0.5,0.9,0.5)
+#od <- c(0.25, 0.25, 0.25)
+t=1e-5
+
+library(parallel)
+m_test <- function(mat_p_2, iteration){
+  #mat_p_list = c(mat_p_list, mat_p_2) 
+  mat_p=c(0.5,mat_p_2,0.5)
+  #print(mat_p)
+  #aveS = Sensitivity_betaBino_iter(iteration,l, e, mat_p, od)
+  aveS = Precision_recall_specificity_betaBino_iter(iteration,l, e, mat_p, od, t)
+  return(c(mat_p_2,aveS))
+}
+
+
+od<-c(0,0.01,0)
+test_0.01=mclapply(seq(0,1,0.05),FUN=function(idx){m_test(idx,iteration = 100)}, mc.cores = 10)
+m1=Get_table_from_simulation(test_0.01)
+m1$OD=0.01
+
+od<-c(0,0.1,0)
+test_0.1=mclapply(seq(0,1,0.05),FUN=function(idx){m_test(idx,iteration = 100)}, mc.cores = 10)
+m2=Get_table_from_simulation(test_0.1)
+m2$OD=0.1
+
+od<-c(0,0.18,0)
+test_0.18=mclapply(seq(0,1,0.05),FUN=function(idx){m_test(idx,iteration = 100)}, mc.cores = 10)
+m5=Get_table_from_simulation(test_0.18)
+m5$OD=0.18
+
+od<-c(0,0.25,0)
+test_0.25=mclapply(seq(0,1,0.05),FUN=function(idx){m_test(idx,iteration = 100)}, mc.cores = 50)
+m3=Get_table_from_simulation(test_0.25)
+m3$OD=0.25
+
+od<-c(0.25,0.25,0.25)
+test_3.25=mclapply(seq(0,1,0.05),FUN=function(idx){m_test(idx,iteration = 100)}, mc.cores = 50)
+m4=Get_table_from_simulation(test_0.25)
+m4$OD=0.25
+
+library("RColorBrewer")
+display.brewer.all()
+# View a single RColorBrewer palette by specifying its name
+display.brewer.pal(n = 7, name = 'Reds')
+# Hexadecimal color specification 
+red_cols = brewer.pal(n = 7, name = "Reds")
+blue_cols = brewer.pal(n = 7, name = "Blues")
+
+pdf("matP_SMS_ODx_precision.pdf")
+method="Allele HMM"
+plot(m1$trait[m1$method==method], m1$precMean[m1$method==method], col=red_cols[2],ylab="mean of precision", xlab="expected maternal reads fraction")
+lines(m1$trait[m1$method==method], m1$precMean[m1$method==method], col=red_cols[2])
+lines(m2$trait[m2$method==method], m2$precMean[m2$method==method], col=red_cols[4])
+points(m2$trait[m2$method==method], m2$precMean[m2$method==method], col=red_cols[4])
+lines(m5$trait[m2$method==method], m5$precMean[m5$method==method], col=red_cols[5])
+points(m5$trait[m2$method==method], m5$precMean[m5$method==method], col=red_cols[5])
+points(m3$trait[m3$method==method], m3$precMean[m3$method==method], col=red_cols[6])
+lines(m4$trait[m4$method==method], m4$precMean[m4$method==method], col=red_cols[7])
+#points(m4$trait[m4$method==method], m4$precMean[m4$method==method], col="blue")
+
+method="SNP independantly"
+points(m1$trait[m1$method==method], m1$precMean[m1$method==method], col=blue_cols[2])
+lines(m1$trait[m1$method==method], m1$precMean[m1$method==method], col=blue_cols[2])
+lines(m2$trait[m2$method==method], m2$precMean[m2$method==method], col=blue_cols[4])
+points(m2$trait[m2$method==method], m2$precMean[m2$method==method], col=blue_cols[4])
+lines(m5$trait[m2$method==method], m5$precMean[m5$method==method], col=blue_cols[5])
+points(m5$trait[m2$method==method], m5$precMean[m5$method==method], col=blue_cols[5])
+points(m3$trait[m3$method==method], m3$precMean[m3$method==method], col=blue_cols[6])
+lines(m4$trait[m4$method==method], m4$precMean[m4$method==method], col=blue_cols[7])
+
+legend("bottomleft", lty =1,col=c(red_cols[7], rev(red_cols[4:5]), red_cols[2]),pch=1,
+       legend=c("0.25", "0.18", "0.10", "0.01"), cex=1.5,lwd=2, bty="n", title = "Allele HMM")
+legend("bottomright", lty =1,col=c(blue_cols[7], rev(blue_cols[4:5]), blue_cols[2]),pch=1,
+       legend=c("0.25", "0.18", "0.10", "0.01"), cex=1.5,lwd=2, bty="n", title ="SNP independantly")
+dev.off()
+
+
+library(ggplot2)
+pdf("matP_SMS_ODx_sensitivity.pdf")
+ggplot(m, aes(x=trait, y=senMean, colour=OD)) + 
+    geom_errorbar(aes(ymin=senMean-senSE, ymax=senMean+senSE), width=.01) +
+    geom_line() +
+    geom_point() +
+  xlab("matP")
+    #theme_bw()
+dev.off()
+
+
+
+
+
+```
+
+
+
 test multi-threads with MatP in betaBinomial
 ```{r}
 ## test multi-threads with MatP
@@ -1634,6 +1759,7 @@ l <- c(10,100,10)
 e <- c(10,10,10)
 mat_p <- c(0.5,0.9,0.5)
 od <- c(0.25, 0.25, 0.25)
+t=1e-5
 
 library(parallel)
 m_test <- function(mat_p_2, iteration){
@@ -1641,7 +1767,7 @@ m_test <- function(mat_p_2, iteration){
   mat_p=c(0.5,mat_p_2,0.5)
   #print(mat_p)
   #aveS = Sensitivity_betaBino_iter(iteration,l, e, mat_p, od)
-  aveS = Precision_recall_specificity_betaBino_iter(iteration,l, e, mat_p, od)
+  aveS = Precision_recall_specificity_betaBino_iter(iteration,l, e, mat_p, od, t)
   return(c(mat_p_2,aveS))
 }
 
