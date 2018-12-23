@@ -1693,6 +1693,11 @@ test_3.25=mclapply(seq(0,1,0.05),FUN=function(idx){m_test(idx,iteration = 100)},
 m4=Get_table_from_simulation(test_0.25)
 m4$OD=0.25
 
+
+m=rbind.data.frame(m1,m2, m5,m3,m4)
+write.table(m, file = "matP_SMS_ODx_sensitivity_and_precision_iter100.txt", quote = F, sep = "\t",row.names = F)
+
+
 library("RColorBrewer")
 display.brewer.all()
 # View a single RColorBrewer palette by specifying its name
@@ -1724,11 +1729,39 @@ points(m3$trait[m3$method==method], m3$precMean[m3$method==method], col=blue_col
 lines(m4$trait[m4$method==method], m4$precMean[m4$method==method], col=blue_cols[7])
 
 legend("bottomleft", lty =1,col=c(red_cols[7], rev(red_cols[4:5]), red_cols[2]),pch=1,
-       legend=c("0.25", "0.18", "0.10", "0.01"), cex=1.5,lwd=2, bty="n", title = "Allele HMM")
+       legend=c("0.25", "0.18", "0.10", "0.01"), cex=1.5,lwd=2, bty="n", title = "Allele HMM OD")
 legend("bottomright", lty =1,col=c(blue_cols[7], rev(blue_cols[4:5]), blue_cols[2]),pch=1,
-       legend=c("0.25", "0.18", "0.10", "0.01"), cex=1.5,lwd=2, bty="n", title ="SNP independantly")
+       legend=c("0.25", "0.18", "0.10", "0.01"), cex=1.5,lwd=2, bty="n", title ="SNP independantly OD")
 dev.off()
 
+
+pdf("matP_SMS_ODx_sensitivity.pdf")
+method="Allele HMM"
+plot(m1$trait[m1$method==method], m1$senMean[m1$method==method], col=red_cols[2],ylab="mean of sensitivity", xlab="expected maternal reads fraction")
+lines(m1$trait[m1$method==method], m1$senMean[m1$method==method], col=red_cols[2])
+lines(m2$trait[m2$method==method], m2$senMean[m2$method==method], col=red_cols[4])
+points(m2$trait[m2$method==method], m2$senMean[m2$method==method], col=red_cols[4])
+lines(m5$trait[m2$method==method], m5$senMean[m5$method==method], col=red_cols[5])
+points(m5$trait[m2$method==method], m5$senMean[m5$method==method], col=red_cols[5])
+points(m3$trait[m3$method==method], m3$senMean[m3$method==method], col=red_cols[6])
+lines(m4$trait[m4$method==method], m4$senMean[m4$method==method], col=red_cols[7])
+#points(m4$trait[m4$method==method], m4$senMean[m4$method==method], col="blue")
+
+method="SNP independantly"
+points(m1$trait[m1$method==method], m1$senMean[m1$method==method], col=blue_cols[2])
+lines(m1$trait[m1$method==method], m1$senMean[m1$method==method], col=blue_cols[2])
+lines(m2$trait[m2$method==method], m2$senMean[m2$method==method], col=blue_cols[4])
+points(m2$trait[m2$method==method], m2$senMean[m2$method==method], col=blue_cols[4])
+lines(m5$trait[m2$method==method], m5$senMean[m5$method==method], col=blue_cols[5])
+points(m5$trait[m2$method==method], m5$senMean[m5$method==method], col=blue_cols[5])
+points(m3$trait[m3$method==method], m3$senMean[m3$method==method], col=blue_cols[6])
+lines(m4$trait[m4$method==method], m4$senMean[m4$method==method], col=blue_cols[7])
+
+legend("bottomleft", lty =1,col=c(red_cols[7], rev(red_cols[4:5]), red_cols[2]),pch=1,
+       legend=c("0.25", "0.18", "0.10", "0.01"), cex=1.5,lwd=2, bty="n", title = "Allele HMM OD")
+legend("bottomright", lty =1,col=c(blue_cols[7], rev(blue_cols[4:5]), blue_cols[2]),pch=1,
+       legend=c("0.25", "0.18", "0.10", "0.01"), cex=1.5,lwd=2, bty="n", title ="SNP independantly OD")
+dev.off()
 
 library(ggplot2)
 pdf("matP_SMS_ODx_sensitivity.pdf")
