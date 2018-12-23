@@ -475,3 +475,23 @@ ggplot(m, aes(x=senMean, y=precMean, colour=method)) +
     ggtitle("Center Block length")
     #theme_bw()
 dev.off()
+
+## test multi-threads with expression level
+# human SNPs number 10
+numberOfBlock <- 3
+#legnth of each block
+l <- c(10,10,10)
+# expression level of each block
+e <- c(10,10,10)
+mat_p <- c(0.5,0.9,0.5)
+
+library(parallel)
+e_test <- function(e_2, iteration){
+  e=c(10, e_2, 10)
+  aveS = Precision_recall_specificity_iter(iteration,l, e, mat_p)
+  return(c(e_2,aveS))
+}
+e_test_out=mclapply(seq(1,50,1),FUN=function(idx){e_test(idx,1000)}, mc.cores = 50)
+
+m=Get_table_from_simulation(e_test_out)
+write.table(m, file = "expression_SMS_OD0_l10_sensitivity_and_precision_iter1K.txt", quote = F, sep = "\t",row.names = F)

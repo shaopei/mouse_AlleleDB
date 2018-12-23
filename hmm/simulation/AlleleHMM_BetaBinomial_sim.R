@@ -472,3 +472,26 @@ ggplot(m, aes(x=senMean, y=precMean, colour=method)) +
     ggtitle("Center Block length")
     #theme_bw()
 dev.off()
+
+
+## test multi-threads with MatP
+
+numberOfBlock <- 3
+#legnth of each block
+l <- c(10,100,10)
+# expression level of each block
+e <- c(10,10,10)
+mat_p <- c(0.5,0.9,0.5)
+od <- c(0.1, 0.1, 0.1)
+
+library(parallel)
+od_test <- function(od_2, iteration){
+  od = c(od_2, od_2, od_2)
+  aveS = Precision_recall_specificity_betaBino_iter(iteration,l, e, mat_p, od)
+  return(c(od_2,aveS))
+}
+
+test=mclapply(seq(0,0.9,0.05),FUN=function(idx){od_test(idx,iteration = 1000)}, mc.cores = 30)
+m=Get_table_from_simulation(test)
+write.table(m, file = "OD_TEST_e10_l100_sensitivity_and_precision_iter1K.txt", quote = F, sep = "\t",row.names = F)
+
