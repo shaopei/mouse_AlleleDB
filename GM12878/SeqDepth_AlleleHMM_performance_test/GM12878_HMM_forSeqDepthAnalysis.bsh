@@ -5,62 +5,59 @@ Max_Pvalue=1
 PL=/workdir/sc2457/tools/After_AlleleDB_pipeline
 
 
-
-# only anaysis autosome now
-grep -v X ${PREFIX}_counts_plus.txt > ${PREFIX}_counts_plus_noX.txt 
-grep -v X ${PREFIX}_counts_minus.txt > ${PREFIX}_counts_minus_noX.txt
-R --vanilla --slave --args $(pwd) ${PREFIX}_counts_plus_noX.txt ${Min_count} ${Max_Pvalue} < ${PL}/filter_counts_file.R 
-R --vanilla --slave --args $(pwd) ${PREFIX}_counts_minus_noX.txt ${Min_count} ${Max_Pvalue} < ${PL}/filter_counts_file.R 
-
 make_count_hmm () {
   PREFIX=$1
-Input_counts_plus=${PREFIX}_counts_plus_noX_MinCount${Min_count}_MaxPvalue${Max_Pvalue}.txt
-Input_counts_minus=${PREFIX}_counts_minus_noX_MinCount${Min_count}_MaxPvalue${Max_Pvalue}.txt
 
 
-# use for hmm
-# $18 0.5 <= CNV <= 1.5
-p_value=0.05
+  # only anaysis autosome now
+  grep -v X ${PREFIX}_counts_plus.txt > ${PREFIX}_counts_plus_noX.txt 
+  grep -v X ${PREFIX}_counts_minus.txt > ${PREFIX}_counts_minus_noX.txt
+  R --vanilla --slave --args $(pwd) ${PREFIX}_counts_plus_noX.txt ${Min_count} ${Max_Pvalue} < ${PL}/filter_counts_file.R 
+  R --vanilla --slave --args $(pwd) ${PREFIX}_counts_minus_noX.txt ${Min_count} ${Max_Pvalue} < ${PL}/filter_counts_file.R 
 
-head ${Input_counts_plus} -n 1 |awk 'BEGIN{OFS="\t"} {print $1,$2,$19, $20, $21, "state"}' > ${PREFIX}_counts_plus_hmm.txt 
-cat ${Input_counts_plus} |\
-awk 'BEGIN{OFS="\t"} ($18 <1.5 && $18 >0.5) {print $1,$2,$19, $20, $21,$14,$15,$16}' |\
-awk -v p=$p_value 'BEGIN{OFS="\t"} ($8 <p) {print $1,$2,$3, $4, $5, $6}; ($8 >=p){print $1,$2,$3, $4, $5, "S"}' >> ${PREFIX}_counts_plus_hmm.txt 
+  Input_counts_plus=${PREFIX}_counts_plus_noX_MinCount${Min_count}_MaxPvalue${Max_Pvalue}.txt
+  Input_counts_minus=${PREFIX}_counts_minus_noX_MinCount${Min_count}_MaxPvalue${Max_Pvalue}.txt
 
-head ${Input_counts_minus} -n 1 |awk 'BEGIN{OFS="\t"} {print $1,$2,$19, $20, $21, "state"}' > ${PREFIX}_counts_minus_hmm.txt 
-cat ${Input_counts_minus} |\
-awk 'BEGIN{OFS="\t"} ($18 <1.5 && $18 >0.5) {print $1,$2,$19, $20, $21,$14,$15,$16}' |\
-awk -v p=$p_value 'BEGIN{OFS="\t"} ($8 <p) {print $1,$2,$3, $4, $5, $6}; ($8 >=p){print $1,$2,$3, $4, $5, "S"}' >> ${PREFIX}_counts_minus_hmm.txt 
+  # use for hmm
+  # $18 0.5 <= CNV <= 1.5
+  p_value=0.05
 
+  head ${Input_counts_plus} -n 1 |awk 'BEGIN{OFS="\t"} {print "chr"$1,$2,$19, $20, $21, "state"}' > ${PREFIX}_counts_plus_hmm.txt 
+  cat ${Input_counts_plus} |\
+  awk 'BEGIN{OFS="\t"} ($18 <1.5 && $18 >0.5) {print "chr"$1,$2,$19, $20, $21,$14,$15,$16}' |\
+  awk -v p=$p_value 'BEGIN{OFS="\t"} ($8 <p) {print "chr"$1,$2,$3, $4, $5, $6}; ($8 >=p){print "chr"$1,$2,$3, $4, $5, "S"}' >> ${PREFIX}_counts_plus_hmm.txt 
 
+  head ${Input_counts_minus} -n 1 |awk 'BEGIN{OFS="\t"} {print "chr"$1,$2,$19, $20, $21, "state"}' > ${PREFIX}_counts_minus_hmm.txt 
+  cat ${Input_counts_minus} |\
+  awk 'BEGIN{OFS="\t"} ($18 <1.5 && $18 >0.5) {print "chr"$1,$2,$19, $20, $21,$14,$15,$16}' |\
+  awk -v p=$p_value 'BEGIN{OFS="\t"} ($8 <p) {print "chr"$1,$2,$3, $4, $5, $6}; ($8 >=p){print "chr"$1,$2,$3, $4, $5, "S"}' >> ${PREFIX}_counts_minus_hmm.txt 
 
+  python AlleleHMM.py -p ${PREFIX}_counts_plus_hmm.txt -m ${PREFIX}_counts_minus_hmm.txt -o ${PREFIX}
 
 }
 
 for i in total 50M 25M 12M 6M 3M
-do
-make_count_hmm SRR1552485_${i} &
+  do
+  make_count_hmm SRR1552485_${i} &
 done
 
 
 
-ln -s /workdir/sc2457/mouse_AlleleSpecific/allelicbias-PersonalGenome_P.CAST_M.B6-LEP_ZYG_ATGCA_forAlleleDB/Tm_Tp_fixed_redo/hmm_spc.py .
-
-#python hmm_spc.py counts_hmm.txt counts_plus_hmm.txt counts_minus_hmm.txt 22
-python AlleleHMM.py -p counts_plus_hmm.txt -m counts_minus_hmm.txt
-
 ##
+
+
+make_map2ref_bed () {
+PREFIX=$1
 PL=/workdir/sc2457/alleleDB/alleledb_pipeline
 MAPS=/workdir/sc2457/alleleseq.gersteinlab.org/NA12878_diploid/NA12878_diploid_2015_feb5_3versions/1kgp3-svs-pass_NA12878_hg19_150109_w_transcriptome/%s_NA12878.map
-PREFIX=SRR1552485_total
+#PREFIX=SRR1552485_total
 #PREFIX=SRR1552485_subQ
 #PREFIX=SRR1552485_Sub20M
-PREFIX=SRR1552485_Sub4M
+#PREFIX=SRR1552485_Sub4M
 MATBOWTIE=${PREFIX}.mat.bowtie
 PATBOWTIE=${PREFIX}.pat.bowtie
 FDR_SIMS=10
 FDR_CUTOFF=0.1
-
 
 # remove AMB reads and sort by index
 python ${PL}/filter_reads_out.py ${PATBOWTIE} - originalmatpatreads.toremove.ids | LC_ALL=C  sort -k1 -n  --parallel=30 -o ${PATBOWTIE}_AMBremoved_sorted &
@@ -99,7 +96,7 @@ cat ${MATBOWTIE}_AMBremoved_sorted_specific.bowtie | awk 'BEGIN {FS= "\t"; OFS="
 cat ${PATBOWTIE}_AMBremoved_sorted_specific.bowtie | awk 'BEGIN {FS= "\t"; OFS="\t"; t="#*o*#"} {print $3, $4, $4+length($5), $1t$5t$2t$6, 111, $2}' > ${PATBOWTIE}_AMBremoved_sorted_specific.bed &
 cat ${PATBOWTIE}_AMBremoved_sorted_identical.bowtie| awk 'BEGIN {FS= "\t"; OFS="\t"; t="#*o*#"} {print $3, $4, $4+length($5), $1t$5t$2t$6, 111, $2}' > ${PATBOWTIE}_AMBremoved_sorted_identical.bed &
 wait
-gzip *${PATBOWTIE}_AMBremoved_sorted_identical.bowtie &
+rm  ${MATBOWTIE}_AMBremoved_sorted_specific.bowtie ${PATBOWTIE}_AMBremoved_sorted_specific.bowtie ${PATBOWTIE}_AMBremoved_sorted_identical.bowtie
 # liftOver to reference genome
 # usage: liftOver oldFile map.chain newFile unMapped
 
@@ -121,10 +118,23 @@ rm ${MATBOWTIE}_AMBremoved_sorted_specific.bed ${PATBOWTIE}_AMBremoved_sorted_sp
 rm ${PATBOWTIE}_AMBremoved_sorted_specific.map2ref.bed ${MATBOWTIE}_AMBremoved_sorted_specific.map2ref.bed ${PATBOWTIE}_AMBremoved_sorted_identical.map2ref.bed
 
 
-ln -s /workdir/sc2457/mouse_AlleleSpecific/allelicbias-PersonalGenome_P.CAST_M.B6-LEP_ZYG_ATGCA_forAlleleDB/Tm_Tp_fixed_redo/sum_of_counts.py .
-ln -s /workdir/sc2457/mouse_AlleleSpecific/allelicbias-PersonalGenome_P.CAST_M.B6-LEP_ZYG_ATGCA_forAlleleDB/Tm_Tp_fixed_redo/getFractionOfBlock_DistanceToNearestSites.R .
-ln -s /workdir/sc2457/tools/After_AlleleDB_pipeline/tss_paired_gm12878_plus.bed .
-ln -s /workdir/sc2457/tools/After_AlleleDB_pipeline/tss_paired_gm12878_minus.bed .
+
+gzip -d *.map2ref.sorted.bed.gz
+MAT_READ_BED=SRR1552485_total.mat.bowtie_AMBremoved_sorted_specific.map2ref.sorted.bed
+PAT_READ_BED=SRR1552485_total.pat.bowtie_AMBremoved_sorted_specific.map2ref.sorted.bed
+IDENTICAL_READ_BED=SRR1552485_total.pat.bowtie_AMBremoved_sorted_identical.map2ref.sorted.bed
+
+bash BinomialTest.bsh -b SRR1552485_total_plus_regions_t1E-05.bed -m ${MAT_READ_BED} -p ${PAT_READ_BED} -i ${IDENTICAL_READ_BED} 
+bash BinomialTest.bsh -b SRR1552485_total_minus_regions_t1E-05.bed -m ${MAT_READ_BED} -p ${PAT_READ_BED} -i ${IDENTICAL_READ_BED} 
+
+
+
+
+
+#ln -s /workdir/sc2457/mouse_AlleleSpecific/allelicbias-PersonalGenome_P.CAST_M.B6-LEP_ZYG_ATGCA_forAlleleDB/Tm_Tp_fixed_redo/sum_of_counts.py .
+#ln -s /workdir/sc2457/mouse_AlleleSpecific/allelicbias-PersonalGenome_P.CAST_M.B6-LEP_ZYG_ATGCA_forAlleleDB/Tm_Tp_fixed_redo/getFractionOfBlock_DistanceToNearestSites.R .
+#ln -s /workdir/sc2457/tools/After_AlleleDB_pipeline/tss_paired_gm12878_plus.bed .
+#ln -s /workdir/sc2457/tools/After_AlleleDB_pipeline/tss_paired_gm12878_minus.bed .
 
 ### counts the maternal, paternal reads, and the reads that cannot tell where it from, in the regions of hmm predictions
 # perform BinomialTest and filter by FDR<= FDR_CUTOFF
