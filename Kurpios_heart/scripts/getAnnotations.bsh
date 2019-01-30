@@ -1,0 +1,32 @@
+#!/usr/bin/bash
+# make merged bigwig
+cd /workdir/sc2457/Kurpios_heart/My_proseq_output_dir-12_13_2018
+bash ../mergeBigWigs.bsh --chrom-info=/local/storage/data/mm10/mm10.chromInfo WT_minus.bw s_4581_WT_dedup_QC_end_minus.bw  s_4590_WT_dedup_QC_end_minus.bw  s_4594_WT_dedup_QC_end_minus.bw  s_4595_WT_dedup_QC_end_minus.bw
+bash ../mergeBigWigs.bsh --chrom-info=/local/storage/data/mm10/mm10.chromInfo WT_plus.bw s_4581_WT_dedup_QC_end_plus.bw  s_4590_WT_dedup_QC_end_plus.bw  s_4594_WT_dedup_QC_end_plus.bw  s_4595_WT_dedup_QC_end_plus.bw
+
+
+
+cd /workdir/sc2457/Kurpios_heart/annotation
+ln -s ~/bin/tuSelecter/* . #*/
+# make input annotatiob file for tuSelecter
+./build_txtable.sh gencode.vM20.annotation.gtf > vM20.txtable.out
+./tuSelecter.R -p 5 -o tuSelecter/  vM20.txtable.out /workdir/sc2457/Kurpios_heart/My_proseq_output_dir-12_13_2018/WT_plus.bw /workdir/sc2457/Kurpios_heart/My_proseq_output_dir-12_13_2018/WT_minus.bw
+
+
+
+
+
+
+#hgsql hg19 -N -e "select chrom,txStart,txEnd,name,score,strand,name2 from refGene" | sort-bed - | gzip > refGene.bed.gz
+
+## Alternate based on GenCode19 and TUSelector
+cd ~/bin/tuSelecter/
+
+./tuSelecter.R -p 5 -o /local/storage/projects/prophaseI/annotations/tuSelecter/  /local/storage/data/mm10/gencode/vM12.txtable.out /local/storage/projects/prophaseI/data/proseq/LZ_R2_plus.bw /local/storage/projects/prophaseI/data/proseq/LZ_R2_minus.bw
+
+cd /local/storage/projects/prophaseI/annotations
+
+
+
+
+
