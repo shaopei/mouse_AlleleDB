@@ -5,8 +5,12 @@ require(bigWig)
 require(cluster)
 
 load("data-rpkms.RData")
-indx <- (tus[,3]-tus[,2])>10000
-pkm <- rpkm[indx,]
+load("data-counts.RData")
+
+indx_counts <- rowSums(counts>10) >= 8
+indx_trxSize<- (tus[,3]-tus[,2])>10000 
+indx <- indx_counts & indx_trxSize
+rpkm <- rpkm[indx,]
 
 yb.sig.pal <- function(n, scale=10) {
  ints<- c(0:(n-1))/(n-1)   ## Linear scale from 0:1 x N values.
@@ -19,13 +23,15 @@ yb.sig.pal <- function(n, scale=10) {
  # Yellow: 255, 255, 0
  # White:  255, 255, 255
  # Blue:   0, 0, 255
- YW <- ints[ints < 0.5] *2
- WB <- (ints[ints >= 0.5]-0.5) *2
+  hinge.point<-0.1
+ 
+ YW <- ints[ints < hinge.point] *2
+ WB <- (ints[ints >= hinge.point]-hinge.point) *2
  YW[YW<0] <- 0; WB[WB>1] <- 1
- c(rgb(1, 1, YW), rgb(1-WB, 1-WB, 1))
+ c(rgb(1, 1 , YW), rgb(1-WB, 1-WB, 1))
 }
 
-drawCor <- function(var1, var2, Labels) {
+drawCor <- function(var1, var2, Labels, hcMethod="average") {
         rpkm_df <- as.matrix(rpkm)
 
         cond <- as.double(as.factor(var1))
@@ -40,7 +46,7 @@ drawCor <- function(var1, var2, Labels) {
 
         ## Print dendrogram and heatmap with latticeExtra.
          library(latticeExtra)
-         hc1 <- hclust(dist(cc, method = "euclidean"),  method="average")
+         hc1 <- hclust(dist(cc, method = "euclidean"),  method=hcMethod)
          hc1 <- as.dendrogram(hc1)
          ord.hc1 <- order.dendrogram(hc1)
          hc2 <- reorder(hc1, cond[ord.hc1])
@@ -65,11 +71,48 @@ drawCor <- function(var1, var2, Labels) {
                                  type = "rectangle"))
                                  ))
          print(pl)
-
-
-pdf("prophaseI-correlation-matrix.pdf")
-drawCor(rep(replicate, 3), c(rep(c(stage[1]), 3), rep(c(stage[2]), 3), rep(c(stage[3]), 3)), colnames(rpkm))
-dev.off()
 }
 
+pdf("Kurpios_heart-correlation-matrix-complete.pdf")
+#drawCor(rep(replicate, 3), c(rep(c(stage[1]), 3), rep(c(stage[2]), 3), rep(c(stage[3]), 3)), colnames(rpkm))
+drawCor(rep(replicate, 2), c(rep(c(stage[1]), 4), rep(c(stage[2]), 4)), colnames(rpkm), "complete")
+dev.off()
 
+pdf("Kurpios_heart-correlation-matrix-single.pdf")
+#drawCor(rep(replicate, 3), c(rep(c(stage[1]), 3), rep(c(stage[2]), 3), rep(c(stage[3]), 3)), colnames(rpkm))
+drawCor(rep(replicate, 2), c(rep(c(stage[1]), 4), rep(c(stage[2]), 4)), colnames(rpkm), "single")
+dev.off()
+
+pdf("Kurpios_heart-correlation-matrix-average.pdf")
+#drawCor(rep(replicate, 3), c(rep(c(stage[1]), 3), rep(c(stage[2]), 3), rep(c(stage[3]), 3)), colnames(rpkm))
+drawCor(rep(replicate, 2), c(rep(c(stage[1]), 4), rep(c(stage[2]), 4)), colnames(rpkm), "average")
+dev.off()
+
+
+# PCA
+pca <- prcomp(rpkm_wPHDHET)
+cols <- c(rep("red",4), rep("blue", 4), rep("black", 2))
+pch <- c(rep(19,4), rep(17,4), rep(15,2))
+
+data.frame(colnames(rpkm), cols, pch)
+summary(pca)
+pdf("PC1.PC2_wPHDHET.pdf")
+plot(y= pca$rotation[,1], x= pca$rotation[,2], col=cols, pch=pch, xlab="PC2", ylab="PC1")
+pairs(pca$rotation[,1:5], col=cols, pch=pch)
+dev.off()
+
+
+#pca <- prcomp(rpkm_df[,1:8], center=FALSE, scale=FALSE) ## UNT
+#pca <- prcomp(rpkm_df[,9:15], center=FALSE, scale=FALSE) ## PI
+#pca <- prcomp(rpkm_df, scale=FALSE, center=FALSE) ## ALL
+pca <- prcomp(rpkm_df, scale=TRUE, center=TRUE)
+cols <- c(rep("red",3), rep("green",3), rep("blue", 3), rep("dark red", 3), rep("dark green", 3), rep("dark blue", 3), "black", "black")#, "pink", "pink")
+pch <- c(rep(19,9), rep(6,9), 9, 24)#, 19, 6)
+data.frame(colnames(rpkm_df), cols, pch)
+
+summary(pca) # Prints variance summary for all principal components.
+
+pdf("PC1.PC2.pdf")
+plot(y= pca$rotation[,1], x= pca$rotation[,2], col=cols, pch=pch, xlab="PC2", ylab="PC1")
+pairs(pca$rotation[,1:5], col=cols, pch=pch)
+dev.off()

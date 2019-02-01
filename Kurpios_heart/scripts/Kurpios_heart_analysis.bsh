@@ -1,0 +1,40 @@
+### get annotaions
+# make merged bigwig
+# cd /workdir/sc2457/Kurpios_heart/
+bash getAnnotations.bsh
+
+myWD=/workdir/sc2457/Kurpios_heart/DEseq_analysis
+mkdir ${myWD}
+cd ${myWD}
+
+
+# rename bw files
+proseq_dir=/workdir/sc2457/Kurpios_heart/My_proseq_output_dir-12_13_2018
+
+for condition in WT MUT
+do
+COUNTER=1
+for f in ${proseq_dir}/*_${condition}_dedup_QC_end_minus.bw #*/
+	do 
+    j=`echo $f |rev|cut -d _ -f 2- | rev`
+    ln -s $f ${condition}_R${COUNTER}_minus.bw
+    ln -s ${j}_plus.bw ${condition}_R${COUNTER}_plus.bw
+    COUNTER=$[$COUNTER +1]
+    done
+done
+
+COUNTER=1
+for f in ${proseq_dir}/*_PHDHET_Cont_dedup_QC_end_minus.bw #*/
+	do 
+    j=`echo $f |rev|cut -d _ -f 2- | rev`
+    ln -s $f PHDHET_R${COUNTER}_minus.bw
+    ln -s ${j}_plus.bw PHDHET_R${COUNTER}_plus.bw
+    COUNTER=$[$COUNTER +1]
+    done
+
+cat gencode.vM20.annotation.gtf | awk 'BEGIN{OFS="\t"} ($3=="gene"){print $0}' |cut -f 9- |grep gene_name |awk '{print $1,$2,$5,$6}'|uniq |awk '{print $2, $4}'|tr -d '"' | tr -d ";" |  LC_ALL=C sort --parallel=30 > gencode.vM20_geneID_name_pair.txt
+
+#R CMD BATCH getCounts.R
+R --vanilla --slave  < getCounts.R
+R --vanilla --slave  < PRO.correlationMatrix.R
+R --vanilla --slave  < get.deSeq2.R

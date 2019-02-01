@@ -4,23 +4,29 @@ require(bigWig)
 
 tus <- read.table("../annotations/tuSelecter/final_tus.txt", header=TRUE)
 tus <- tus[(tus$TXEND-tus$TXSTART)>500,]
+geneID_name <- read.table("../annotations/gencode.vM20_geneID_name_pair.txt", header=F)
+#colnames(geneID_name)=c("GENEID", "GENENAME")
 
+library("sqldf")
+new_tus <- sqldf ("select TXCHROM,TXSTART,TXEND,GENEID,TXNAME,TXSTRAND,V2,TXTYPE from tus left join geneID_name on tus.GENEID=geneID_name.V1" )
+colnames(new_tus)[7]="GENENAME"
+tus <- new_tus
 bodies <- tus
-bodies$TXSTART[bodies$TXSTRAND == "+"] <-bodies$TXSTART[bodies$TXSTRAND == "+"]+250
-bodies$TXEND[bodies$TXSTRAND == "-"] <- bodies$TXEND[bodies$TXSTRAND == "-"]-250
+# bodies$TXSTART[bodies$TXSTRAND == "+"] <-bodies$TXSTART[bodies$TXSTRAND == "+"]+250
+# bodies$TXEND[bodies$TXSTRAND == "-"] <- bodies$TXEND[bodies$TXSTRAND == "-"]-250
 
-pause <- tus
-pause$TXEND[bodies$TXSTRAND == "+"] <-bodies$TXSTART[bodies$TXSTRAND == "+"]+250
-pause$TXSTART[bodies$TXSTRAND == "-"] <- bodies$TXEND[bodies$TXSTRAND == "-"]-250
+# pause <- tus
+# pause$TXEND[bodies$TXSTRAND == "+"] <-bodies$TXSTART[bodies$TXSTRAND == "+"]+250
+# pause$TXSTART[bodies$TXSTRAND == "-"] <- bodies$TXEND[bodies$TXSTRAND == "-"]-250
 
-postcps <- tus
-postcps$TXSTART[bodies$TXSTRAND == "+"] <- bodies$TXEND[bodies$TXSTRAND == "+"]
-postcps$TXEND[bodies$TXSTRAND == "+"] <- bodies$TXEND[bodies$TXSTRAND == "+"]+15000
-postcps$TXEND[bodies$TXSTRAND == "-"] <- bodies$TXSTART[bodies$TXSTRAND == "-"]
-postcps$TXSTART[bodies$TXSTRAND == "-"] <- bodies$TXSTART[bodies$TXSTRAND == "-"]-15000
-postcps$TXSTART[postcps$TXSTART < 0] <- 0
+# postcps <- tus
+# postcps$TXSTART[bodies$TXSTRAND == "+"] <- bodies$TXEND[bodies$TXSTRAND == "+"]
+# postcps$TXEND[bodies$TXSTRAND == "+"] <- bodies$TXEND[bodies$TXSTRAND == "+"]+15000
+# postcps$TXEND[bodies$TXSTRAND == "-"] <- bodies$TXSTART[bodies$TXSTRAND == "-"]
+# postcps$TXSTART[bodies$TXSTRAND == "-"] <- bodies$TXSTART[bodies$TXSTRAND == "-"]-15000
+# postcps$TXSTART[postcps$TXSTART < 0] <- 0
 
-countBigWig <- function(prefix, bed, rpkm=FALSE, path="../data/proseq/") {
+countBigWig <- function(prefix, bed, rpkm=FALSE, path="./") {
  pl <- load.bigWig(paste(path, prefix, "_plus.bw", sep=""))
  mn <- load.bigWig(paste(path, prefix, "_minus.bw", sep=""))
 
@@ -32,35 +38,42 @@ countBigWig <- function(prefix, bed, rpkm=FALSE, path="../data/proseq/") {
  return(counts)
 }
 
-stage     <- c("LZ", "P", "D")
+stage     <- c("WT", "MUT")
 replicate <- c(1, 2, 3, 4)
 
-filenames <- c(paste("LZ_R", replicate, sep=""), paste("P_R", replicate, sep=""), paste("D_R", replicate, sep=""))
+filenames <- c(paste("WT_R", replicate, sep=""), paste("MUT_R", replicate, sep=""))
+filenames <- c(filenames, "PHDHET_R1", "PHDHET_R2")
 
 ## Gets counts
 counts <- NULL
-pause_counts <- NULL
-postcps_counts <- NULL
+#pause_counts <- NULL
+#postcps_counts <- NULL
 for(f in filenames) {
 	counts <- cbind(counts, countBigWig(f, bodies, rpkm=FALSE))
-        pause_counts <- cbind(pause_counts, countBigWig(f, pause, rpkm=FALSE))
-	postcps_counts <- cbind(postcps_counts, countBigWig(f, postcps, rpkm=FALSE)) 
+    #pause_counts <- cbind(pause_counts, countBigWig(f, pause, rpkm=FALSE))
+	#postcps_counts <- cbind(postcps_counts, countBigWig(f, postcps, rpkm=FALSE)) 
 }
 colnames(counts) <- filenames
-save.image("data-counts.RData")
-remove(counts); remove(pause_counts); remove(postcps_counts)
+counts_wPHDHET <-counts
+remove(counts)
+save.image("data-counts_wPHDHET.RData")
+#save.image("data-counts.RData")
+remove(counts_wPHDHET); #remove(pause_counts); remove(postcps_counts)
 
 ## Gets RPKMs
 rpkm <- NULL
-pause_rpkm <- NULL
-postcps_rpkm <- NULL
+#pause_rpkm <- NULL
+#postcps_rpkm <- NULL
 for(f in filenames) {
-        rpkm <- cbind(rpkm, countBigWig(f, bodies, rpkm=TRUE))
-	pause_rpkm <- cbind(pause_rpkm, countBigWig(f, pause, rpkm=TRUE))
-	postcps_rpkm <- cbind(postcps_rpkm, countBigWig(f, postcps, rpkm=TRUE))
+    rpkm <- cbind(rpkm, countBigWig(f, bodies, rpkm=TRUE))
+	#pause_rpkm <- cbind(pause_rpkm, countBigWig(f, pause, rpkm=TRUE))
+	#postcps_rpkm <- cbind(postcps_rpkm, countBigWig(f, postcps, rpkm=TRUE))
 }
 colnames(rpkm) <- filenames
-save.image("data-rpkms.RData")
+rpkm_wPHDHET <-rpkm
 remove(rpkm)
+#save.image("data-rpkms.RData")
+save.image("data-rpkms_wPHDHET.RData")
+remove(rpkm_wPHDHET)
 
 

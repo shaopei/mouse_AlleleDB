@@ -12,7 +12,8 @@ FDR.lv<- 0.01
 ## Add specific genes to the plot.
 addlab <- function(GENEID, deRes, genes, ...) {
  idx<-sapply(GENEID, function(GENEID) {
-  ig <- which(genes[,4] == GENEID)
+  #ig <- which(genes[,4] == GENEID)
+  ig <- which(genes[,7] == GENEID)
   io <- ig[which.min(deRes$padj[ig])]
   if(NROW(io)>0) {
         text(deRes$baseMean[io], deRes$log2FoldChange[io], labels= GENEID, cex= 1, pos= 3, ...)
@@ -25,44 +26,38 @@ addlab <- function(GENEID, deRes, genes, ...) {
  return(data.frame(Gene= genes[idx,7], AveExpr= deRes$baseMean[idx], logFC= deRes$log2FoldChange[idx], adj.P.Val= deRes$padj[idx]))
 }
 
-condition <- c(rep("LZ", 4), rep("P", 4), rep("D", 4))
-replicate <- factor(rep(c(1:4), 3))
+condition <- c(rep("WT", 4), rep("MUT", 4))
+replicate <- factor(rep(c(1:4), 2))
 Design <- data.frame(colnames(counts), condition, replicate)
 
 ## Workaround for deSeq2 issues ...
-setClassUnion("characterORNULL", c("character", "NULL"))
-setClassUnion("DataTableORNULL", c("DataTable", "NULL"))
+#setClassUnion("characterORNULL", c("character", "NULL"))
+#setClassUnion("DataTableORNULL", c("DataTable", "NULL"))
+
 
 ## Create DESeq2 object.
 dds <- DESeqDataSetFromMatrix(countData= counts, colData= Design, design= ~condition+replicate)
 
 dds <- DESeq(dds)
-res_lz_p <- results(dds, contrast=c("condition","LZ","P"))
-res_p_d  <- results(dds, contrast=c("condition","P","D"))
+res_wt_mut <- results(dds, contrast=c("condition","WT","MUT"))
+
 
  
-print(paste("Number of changes: ", sum(res_lz_p$padj < FDR.lv, na.rm=TRUE))) ## Number of transcripts.
-print(paste("Number of changes: ", sum(res_p_d$padj < FDR.lv, na.rm=TRUE))) ## Number of transcripts.
+print(paste("Number of changes: ", sum(res_wt_mut$padj < FDR.lv, na.rm=TRUE))) ## Number of transcripts.
+#print(paste("Number of changes: ", sum(res_p_d$padj < FDR.lv, na.rm=TRUE))) ## Number of transcripts.
 
- pdf(paste("results/LZ-P.pdf", sep=""))
-  plotMA(res_lz_p, alpha= FDR.lv, cex=0.75, ylab= "Log Fold-Change", ylim=c(-5, 5))
-  addlab(c("Adam3", "Zfy1", "Adam18", "Stag3"), res_lz_p, bodies) ##
+ pdf(paste("WT-MUT.pdf", sep=""))
+  plotMA(res_wt_mut, alpha= FDR.lv, cex=0.75, ylab= "Log Fold-Change", ylim=c(-5, 5))
+  addlab(c("Pitx2"), res_wt_mut, bodies) ## ENSMUSG00000028023.16 is PITX2
+  #addlab(c("ENSMUSG00000028023.16"), res_wt_mut, bodies) ## ENSMUSG00000028023.16 is PITX2
  dev.off()
 
- pdf(paste("results/P-D.pdf", sep=""))
-  plotMA(res_p_d, alpha= FDR.lv, cex=0.75, ylab= "Log Fold-Change", ylim=c(-5, 5))
-  addlab(c("Adam3", "Zfy1", "Adam18", "Stag3"), res_p_d, bodies) ##
- dev.off()
+
 
 ## Write out genes.
-PX <- cbind(bodies, res_lz_p)
+PX <- cbind(bodies, res_wt_mut)
 PX <- PX[order(PX$padj),]
-write.table(PX, "results/LZ-P-changed.genes.tsv", sep="\t", row.names=FALSE, col.names=FALSE, quote=FALSE)
-
-PX <- cbind(bodies, res_p_d)
-PX <- PX[order(PX$padj),]
-write.table(PX, "results/P-D-changed.genes.tsv", sep="\t", row.names=FALSE, col.names=FALSE, quote=FALSE)
-
-
+write.table(PX, "WT-MUT-changed.genes.tsv", sep="\t", row.names=FALSE, col.names=T, quote=FALSE)
+#write.table(PX, "WT-MUT-changed.genes.tsv", sep="\t", row.names=T, col.names=T, quote=FALSE)
 
 
