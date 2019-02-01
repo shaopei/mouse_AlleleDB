@@ -7,8 +7,8 @@ require(cluster)
 load("data-rpkms.RData")
 load("data-counts.RData")
 
-indx_counts <- rowSums(counts>10) >= 8
-indx_trxSize<- (tus[,3]-tus[,2])>10000 
+indx_counts <- rowSums(counts>10) >= dim(counts)[2]  #every sample has at least 10 reads
+indx_trxSize<- (tus[,3]-tus[,2])>10000  # to get a robost signal
 indx <- indx_counts & indx_trxSize
 rpkm <- rpkm[indx,]
 

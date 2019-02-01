@@ -10,10 +10,10 @@ library("DESeq2")
 FDR.lv<- 0.01
 
 ## Add specific genes to the plot.
-addlab <- function(GENEID, deRes, genes, ...) {
+addlab <- function(GENEID, deRes, genes, ...) {  
  idx<-sapply(GENEID, function(GENEID) {
   #ig <- which(genes[,4] == GENEID)
-  ig <- which(genes[,7] == GENEID)
+  ig <- which(genes[,7] == GENEID) #use GENENAME instead of GENEID
   io <- ig[which.min(deRes$padj[ig])]
   if(NROW(io)>0) {
         text(deRes$baseMean[io], deRes$log2FoldChange[io], labels= GENEID, cex= 1, pos= 3, ...)
