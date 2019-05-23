@@ -1,0 +1,105 @@
+# http://epigenomegateway.wustl.edu/browser/?genome=mm10&datahub=ftp://cbsuftp.tc.cornell.edu/danko/hub/F1_Tissues/mm10/trackDb_BN.json
+  # Example here: http://vizhub.wustl.edu/hubSample/hg19/hub.json
+
+  # Note: Epigenome browser does not seem to support bigBed: 
+  [
+{
+  type:"bigwig",
+  url:"ftp://cbsuftp.tc.cornell.edu/danko/hub/F1_Tissues/mm10/BN_all_plus.rpm.bw",
+  name: "Brain, PRO-seq(+)",
+  fixedscale:{min:0,max:0.5},
+  colorpositive:"#ff0000",
+  colornegative:"#0000e5",
+  backgroundcolor:"#fffef7",
+  height:50,
+  mode:"show",
+  summarymethod: "max",
+},
+{
+  type:"bigwig",
+  url:"ftp://cbsuftp.tc.cornell.edu/danko/hub/F1_Tissues/mm10/BN_all_minus.rpm.bw",
+  name: "Brain, PRO-seq(-)",
+  fixedscale:{min:-0.5,max:0},
+  colorpositive:"#ff0000",
+  colornegative:"#0000e5",
+  backgroundcolor:"#fffef7",
+  height:50,
+  mode:"show",
+  summarymethod: "min",
+},
+{
+type: "bigbed",
+name: "Brain M:B6 (+) AlleleHMM",
+url:"ftp://cbsuftp.tc.cornell.edu/danko/hub/F1_Tissues/mm10/BN_MB6_HMM_sorted_plus.bb",
+mode:"show",
+},
+{
+type: "bigbed",
+name: "Brain M:B6 (-) AlleleHMM",
+url:"ftp://cbsuftp.tc.cornell.edu/danko/hub/F1_Tissues/mm10/BN_MB6_HMM_sorted_minus.bb",
+mode:"show",
+},
+{
+type: "bigbed",
+name: "Brain M:Cast (+) AlleleHMM",
+url:"ftp://cbsuftp.tc.cornell.edu/danko/hub/F1_Tissues/mm10/BN_PB6_HMM_sorted_plus.bb",
+mode:"show",
+},
+{
+type: "bigbed",
+name: "Brain M:Cast (-) AlleleHMM",
+url:"ftp://cbsuftp.tc.cornell.edu/danko/hub/F1_Tissues/mm10/BN_PB6_HMM_sorted_minus.bb",
+mode:"show",
+},
+{
+  type:"bigwig",
+  url:"ftp://cbsuftp.tc.cornell.edu/danko/hub/F1_Tissues/mm10/BN_all.dREG.infp.bw",
+  name: "Brain, dREG prediction score",
+  fixedscale:{min:0,max:1.5},
+  colorpositive:"#99d8c9",
+  colornegative:"#0000e5",
+  height:20,
+  mode:"show",
+  summarymethod: "max",
+},
+{
+type: "bigbed",
+name: "Brain M:B6 Combined AlleleHMM Fisher p<0.05",
+url:"ftp://cbsuftp.tc.cornell.edu/danko/hub/F1_Tissues/mm10/BN_MB6_combined_R1_HMM_ABconsistent_FisherMethodP0.05.bb",
+mode:"show",
+},
+{
+type: "bigbed",
+name: "Brain M:B6 ASE Transcript",
+url:"ftp://cbsuftp.tc.cornell.edu/danko/hub/F1_Tissues/mm10/BN_MB6_transcript_ABconsistent_FisherMethodP0.05.bb",
+mode:"show",
+},
+{
+  type:"bedgraph",
+  url: "ftp://cbsuftp.tc.cornell.edu/danko/hub/F1_Tissues/mm10/BN_all.dREG.peak.score.bed.gz",
+  fixedscale:{min:0,max:0.00001},
+  name: "Brain dREG peak",
+  colorpositive:"#99d8c9",
+  height:10,
+  mode: "show",
+},
+{
+type: "bigbed",
+name: "Brain M:Cast Combined AlleleHMM Fisher p<0.05",
+url:"ftp://cbsuftp.tc.cornell.edu/danko/hub/F1_Tissues/mm10/BN_PB6_combined_R1_HMM_ABconsistent_FisherMethodP0.05.bb",
+mode:"show",
+},
+{
+type: "bigbed",
+name: "Brain M:Cast ASE Transcript",
+url:"ftp://cbsuftp.tc.cornell.edu/danko/hub/F1_Tissues/mm10/BN_PB6_transcript_ABconsistent_FisherMethodP0.05.bb",
+mode:"show",
+},
+
+# a pack of native tracks (supplied by the browser server)
+  {
+  type:"native_track",list:[
+    {name:"refGene",mode:"full"},
+    ],
+  },
+  ]
