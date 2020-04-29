@@ -42,6 +42,7 @@ stage     <- c("WT", "MUT")
 replicate <- c(1, 2, 3, 4)
 
 filenames <- c(paste("WT_R", replicate, sep=""), paste("MUT_R", replicate, sep=""))
+stage     <- c("WT", "MUT", "PHDHET")
 filenames <- c(filenames, "PHDHET_R1", "PHDHET_R2")
 
 ## Gets counts
@@ -55,10 +56,10 @@ for(f in filenames) {
 }
 colnames(counts) <- filenames
 counts_wPHDHET <-counts
-remove(counts)
+#remove(counts)
 save.image("data-counts_wPHDHET.RData")
 #save.image("data-counts.RData")
-remove(counts_wPHDHET); #remove(pause_counts); remove(postcps_counts)
+#remove(counts_wPHDHET); #remove(pause_counts); remove(postcps_counts)
 
 ## Gets RPKMs
 rpkm <- NULL
@@ -71,9 +72,9 @@ for(f in filenames) {
 }
 colnames(rpkm) <- filenames
 rpkm_wPHDHET <-rpkm
-remove(rpkm)
+#remove(rpkm)
 #save.image("data-rpkms.RData")
 save.image("data-rpkms_wPHDHET.RData")
-remove(rpkm_wPHDHET)
+#remove(rpkm_wPHDHET)
 
 

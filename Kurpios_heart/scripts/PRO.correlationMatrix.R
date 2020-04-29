@@ -4,15 +4,16 @@
 require(bigWig)
 require(cluster)
 
-load("data-rpkms.RData")
-load("data-counts.RData")
+load("data-rpkms_wPHDHET.RData")
+load("data-counts_wPHDHET.RData")
 
 indx_counts <- rowSums(counts>10) >= dim(counts)[2]  #every sample has at least 10 reads
 indx_trxSize<- (tus[,3]-tus[,2])>10000  # to get a robost signal
 indx <- indx_counts & indx_trxSize
 rpkm <- rpkm[indx,]
+write.table(rpkm, file = "rpkms.txt", quote = F, sep = "\t")
 
-yb.sig.pal <- function(n, scale=10) {
+?hclustyb.sig.pal <- function(n, scale=10) {
  ints<- c(0:(n-1))/(n-1)   ## Linear scale from 0:1 x N values.
  ints<- 1/(1+exp(scale*(0.5-ints)))## Transfer to sigmoidal scale.
  b<- min(ints)
@@ -75,30 +76,47 @@ drawCor <- function(var1, var2, Labels, hcMethod="average") {
 
 pdf("Kurpios_heart-correlation-matrix-complete.pdf")
 #drawCor(rep(replicate, 3), c(rep(c(stage[1]), 3), rep(c(stage[2]), 3), rep(c(stage[3]), 3)), colnames(rpkm))
-drawCor(rep(replicate, 2), c(rep(c(stage[1]), 4), rep(c(stage[2]), 4)), colnames(rpkm), "complete")
+drawCor(c(rep(c(stage[1]), 4), rep(c(stage[2]), 4), rep(c(stage[3]), 2)), c(rep(c(stage[1]), 4), rep(c(stage[2]), 4), rep(c(stage[3]), 2)), colnames(rpkm), "complete")
 dev.off()
 
 pdf("Kurpios_heart-correlation-matrix-single.pdf")
 #drawCor(rep(replicate, 3), c(rep(c(stage[1]), 3), rep(c(stage[2]), 3), rep(c(stage[3]), 3)), colnames(rpkm))
-drawCor(rep(replicate, 2), c(rep(c(stage[1]), 4), rep(c(stage[2]), 4)), colnames(rpkm), "single")
+drawCor(c(rep(c(stage[1]), 4), rep(c(stage[2]), 4), rep(c(stage[3]), 2)), c(rep(c(stage[1]), 4), rep(c(stage[2]), 4), rep(c(stage[3]), 2)), colnames(rpkm), "single")
 dev.off()
 
 pdf("Kurpios_heart-correlation-matrix-average.pdf")
 #drawCor(rep(replicate, 3), c(rep(c(stage[1]), 3), rep(c(stage[2]), 3), rep(c(stage[3]), 3)), colnames(rpkm))
-drawCor(rep(replicate, 2), c(rep(c(stage[1]), 4), rep(c(stage[2]), 4)), colnames(rpkm), "average")
+drawCor(c(rep(c(stage[1]), 4), rep(c(stage[2]), 4), rep(c(stage[3]), 2)), c(rep(c(stage[1]), 4), rep(c(stage[2]), 4), rep(c(stage[3]), 2)), colnames(rpkm), "average")
 dev.off()
 
 
 # PCA
+rpkm_wPHDHET <- rpkm
 pca <- prcomp(rpkm_wPHDHET)
 cols <- c(rep("red",4), rep("blue", 4), rep("black", 2))
 pch <- c(rep(19,4), rep(17,4), rep(15,2))
 
-data.frame(colnames(rpkm), cols, pch)
+data.frame(colnames(rpkm_wPHDHET), cols, pch)
 summary(pca)
-pdf("PC1.PC2_wPHDHET.pdf")
-plot(y= pca$rotation[,1], x= pca$rotation[,2], col=cols, pch=pch, xlab="PC2", ylab="PC1")
-pairs(pca$rotation[,1:5], col=cols, pch=pch)
+pdf("PC1.PC2_wPHDHET.pdf", width = 9, height = 8)
+par(mar=c(6.1, 7.1, 2.1, 2.1)) #d l u r 5.1, 4.1, 4.1, 2.1
+par(mgp=c(3,1,0))
+par(cex.lab=2.2, cex.axis=2.2)
+plot(y= pca$rotation[,1], x= pca$rotation[,2], col=cols, pch=pch, xlab="PC2", ylab="PC1", cex=1.5, las=1)
+legend("topright",col=c("red","blue", "black"),pch=c(19,17,15),
+       legend=c("WT","MUT","PHDHET"), bty="n", cex=1.5)
+#pairs(pca$rotation[,1:5], col=cols, pch=pch)
+dev.off()
+
+pdf("PC1.PC2_wPHDHET_wLabel.pdf", width = 9, height = 8)
+par(mar=c(6.1, 7.1, 2.1, 2.1)) #d l u r 5.1, 4.1, 4.1, 2.1
+par(mgp=c(3,1,0))
+par(cex.lab=2.2, cex.axis=2.2)
+plot(y= pca$rotation[,1], x= pca$rotation[,2], col=cols, pch=pch, xlab="PC2", ylab="PC1", cex=1.5, las=1, label=TRUE)
+legend("topright",col=c("red","blue", "black"),pch=c(19,17,15),
+       legend=c("WT","MUT","PHDHET"), bty="n", cex=1.5)
+text(y= pca$rotation[,1], x= pca$rotation[,2] , labels=colnames(rpkm_wPHDHET), pos=3)
+#pairs(pca$rotation[,1:5], col=cols, pch=pch)
 dev.off()
 
 
