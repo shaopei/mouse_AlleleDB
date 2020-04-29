@@ -13,7 +13,7 @@ indx <- indx_counts & indx_trxSize
 rpkm <- rpkm[indx,]
 write.table(rpkm, file = "rpkms.txt", quote = F, sep = "\t")
 
-?hclustyb.sig.pal <- function(n, scale=10) {
+yb.sig.pal <- function(n, scale=10) {
  ints<- c(0:(n-1))/(n-1)   ## Linear scale from 0:1 x N values.
  ints<- 1/(1+exp(scale*(0.5-ints)))## Transfer to sigmoidal scale.
  b<- min(ints)
