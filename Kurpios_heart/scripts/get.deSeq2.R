@@ -5,6 +5,17 @@ require(bigWig)
 
 load("data-counts.RData")
 
+tus <- read.table("../annotations/tuSelecter/final_tus.txt", header=TRUE)
+tus <- tus[(tus$TXEND-tus$TXSTART)>500,]
+geneID_name <- read.table("../annotations/gencode.vM20_geneID_name_pair.txt", header=F)
+#colnames(geneID_name)=c("GENEID", "GENENAME")
+
+library("sqldf")
+new_tus <- sqldf ("select TXCHROM,TXSTART,TXEND,GENEID,TXNAME,TXSTRAND,V2,TXTYPE from tus left join geneID_name on tus.GENEID=geneID_name.V1" )
+colnames(new_tus)[7]="GENENAME"
+tus <- new_tus
+bodies <- tus
+
 library("DESeq2")
 
 FDR.lv<- 0.01
@@ -42,17 +53,32 @@ dds <- DESeq(dds)
 res_wt_mut <- results(dds, contrast=c("condition","WT","MUT"))
 
 
+
  
 print(paste("Number of changes: ", sum(res_wt_mut$padj < FDR.lv, na.rm=TRUE))) ## Number of transcripts.
 #print(paste("Number of changes: ", sum(res_p_d$padj < FDR.lv, na.rm=TRUE))) ## Number of transcripts.
 
- pdf(paste("WT-MUT.pdf", sep=""))
+ pdf(paste("WT-MUT.pdf", sep=""), useDingbats=FALSE)
   plotMA(res_wt_mut, alpha= FDR.lv, cex=0.75, ylab= "Log Fold-Change", ylim=c(-5, 5))
-  addlab(c("Pitx2"), res_wt_mut, bodies) ## ENSMUSG00000028023.16 is PITX2
   #addlab(c("ENSMUSG00000028023.16"), res_wt_mut, bodies) ## ENSMUSG00000028023.16 is PITX2
  dev.off()
 
+ pdf(paste("WT-MUT-labeled.pdf", sep=""), useDingbats=FALSE)
+  plotMA(res_wt_mut, alpha= FDR.lv, cex=0.75, ylab= "Log Fold-Change", ylim=c(-5, 5))
+  addlab(c("Pitx2", "Tbx5"), res_wt_mut, bodies) ## ENSMUSG00000028023.16 is PITX2
+  addlab(c("Tbx5"), res_wt_mut, bodies)
+  addlab(c("Hcn1"), res_wt_mut, bodies)
+  addlab(c("Ryr2"), res_wt_mut, bodies)
+  addlab(c("Gja1"), res_wt_mut, bodies)
+  #addlab(c("ENSMUSG00000028023.16"), res_wt_mut, bodies) ## ENSMUSG00000028023.16 is PITX2
+ dev.off()
 
+ pdf(paste("WT-MUT-fdr0.01-labeled-3.pdf", sep=""), useDingbats=FALSE)
+  #plotMA(res_wt_mut[8900:8999,], alpha= FDR.lv, cex=0.75, ylab= "Log Fold-Change", ylim=c(-5, 5))
+  #plot(1,1000, cex=0.75, ylab= "Log Fold-Change", ylim=c(-5, 5), xlim = c(0,10000), log="x")
+    plotMA(res_wt_mut[c(which(res_wt_mut$padj < FDR.lv),1:10),], alpha= FDR.lv, cex=0.75, ylab= "Log Fold-Change", ylim=c(-5, 5))
+    addlab(unique(bodies$GENENAME[res_wt_mut$padj < FDR.lv]), res_wt_mut, bodies)
+dev.off()
 
 ## Write out genes.
 PX <- cbind(bodies, res_wt_mut)
